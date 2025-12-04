@@ -52,9 +52,9 @@ class SensorWidget(QWidget):
     
     def update_value(self, value):
         """Update the sensor value display."""
-        # Update the label_value with the temperature value
-        if hasattr(self, 'label_value'):
-            self.label_value.setText(f"{value}°C")
+        # Update the doubleSpinBox with the temperature value
+        if hasattr(self, 'doubleSpinBox'):
+            self.doubleSpinBox.setValue(value)
 
 
 class MainWindow(QMainWindow):
