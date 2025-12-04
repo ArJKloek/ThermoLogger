@@ -3,7 +3,23 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFontDatabase
 from PyQt6 import uic
+
+
+def load_fonts():
+    """Load custom fonts from the fonts directory."""
+    fonts_dir = Path(__file__).parent / "fonts"
+    
+    if fonts_dir.exists():
+        for font_file in fonts_dir.glob("*.ttf"):
+            font_id = QFontDatabase.addApplicationFont(str(font_file))
+            if font_id >= 0:
+                print(f"Loaded font: {font_file.name}")
+            else:
+                print(f"Failed to load font: {font_file.name}")
+    else:
+        print(f"Fonts directory not found at {fonts_dir}")
 
 
 class SensorWidget(QWidget):
@@ -99,6 +115,9 @@ class MainWindow(QMainWindow):
 def main():
     """Main entry point for the application."""
     app = QApplication(sys.argv)
+    
+    # Load custom fonts
+    load_fonts()
     
     # Create and show main window
     window = MainWindow()

@@ -45,6 +45,7 @@
     <widget class="QLabel" name="label_value">
      <property name="font">
       <font>
+       <family>Digital-7</family>
        <pointsize>14</pointsize>
       </font>
      </property>
