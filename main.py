@@ -58,7 +58,7 @@ class SensorWidget(QWidget):
         if hasattr(self, 'label_value'):
             try:
                 numeric_value = float(value)
-                text = f"{numeric_value:.2f}°C"
+                text = f"{numeric_value:.1f}°C"
             except (TypeError, ValueError):
                 text = "-- °C"
             self.label_value.setText(text)

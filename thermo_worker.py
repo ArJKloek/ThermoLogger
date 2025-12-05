@@ -43,7 +43,7 @@ class DummySMtc:
             phase = ch_idx * 0.6
             temp = base_temp + 2.5 * math.sin(time.time() / 15.0 + phase)
         
-        return round(temp, 2)
+        return round(temp, 1)
 
 
 class ThermoThread(QThread):
