@@ -6,6 +6,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFontDatabase
 from PyQt6 import uic
 
+from thermo_worker import ThermoThread
+
 
 def load_fonts():
     """Load custom fonts from the fonts directory."""
@@ -54,7 +56,12 @@ class SensorWidget(QWidget):
         """Update the sensor value display."""
         # Update the label_value with the temperature value
         if hasattr(self, 'label_value'):
-            self.label_value.setText(f"{value}°C")
+            try:
+                numeric_value = float(value)
+                text = f"{numeric_value:.2f}°C"
+            except (TypeError, ValueError):
+                text = "-- °C"
+            self.label_value.setText(text)
 
 
 class MainWindow(QMainWindow):
@@ -62,6 +69,9 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        self.channel_count = 8
+        self.sensors = []
+        self.worker = None
         self.init_ui()
     
     def init_ui(self):
@@ -84,6 +94,9 @@ class MainWindow(QMainWindow):
         
         # Add sensor widgets to the central widget
         self.setup_sensors()
+
+        # Start background reader (uses dummy data when hardware is absent)
+        self.start_worker()
     
     def setup_sensors(self):
         """Add multiple sensor widgets to the main window."""
@@ -95,21 +108,42 @@ class MainWindow(QMainWindow):
         # Get the layout
         layout = self.centralwidget.layout()
         
-        # Add three temperature sensors
-        self.sensor1 = SensorWidget("Temperature Sensor 1")
-        self.sensor2 = SensorWidget("Temperature Sensor 2")
-        self.sensor3 = SensorWidget("Temperature Sensor 3")
-        
-        layout.addWidget(self.sensor1)
-        layout.addWidget(self.sensor2)
-        layout.addWidget(self.sensor3)
+        # Add a widget per channel
+        for idx in range(self.channel_count):
+            sensor = SensorWidget(f"Thermocouple {idx + 1}")
+            layout.addWidget(sensor)
+            self.sensors.append(sensor)
+
         layout.addStretch()
-        
-        # Example: Update sensor values (you can connect this to real data)
-        self.sensor1.update_value(22.5)
-        self.sensor2.update_value(102.1)
-        self.sensor3.update_value(121.8)
-        
+
+    def start_worker(self):
+        """Start the background reader thread."""
+        self.worker = ThermoThread(interval_sec=1.0, channels=self.channel_count)
+        self.worker.reading_ready.connect(self.update_readings)
+        self.worker.source_changed.connect(self.on_source_changed)
+        self.worker.error.connect(self.on_error)
+        self.worker.start()
+
+    def update_readings(self, readings):
+        for idx, value in enumerate(readings):
+            if idx < len(self.sensors):
+                self.sensors[idx].update_value(value)
+
+    def on_source_changed(self, source: str):
+        message = f"Reading source: {source}"
+        print(message)
+        if hasattr(self, 'statusbar'):
+            self.statusbar.showMessage(message, 3000)
+
+    def on_error(self, message: str):
+        print(f"Reader error: {message}")
+        if hasattr(self, 'statusbar'):
+            self.statusbar.showMessage(message, 5000)
+
+    def closeEvent(self, event):
+        if self.worker and self.worker.isRunning():
+            self.worker.stop()
+        super().closeEvent(event)
         
 
 def main():
