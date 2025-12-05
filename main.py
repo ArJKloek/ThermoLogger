@@ -116,7 +116,8 @@ class MainWindow(QMainWindow):
             self.sensors.append(sensor)
 
         # Add stretch at the bottom
-        layout.addStretch(self.channel_count // 2 + 1, 0)
+        stretch_row = self.channel_count // 2 + 1
+        layout.setRowStretch(stretch_row, 1)
 
     def start_worker(self):
         """Start the background reader thread."""
