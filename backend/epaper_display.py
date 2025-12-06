@@ -42,26 +42,29 @@ class EpaperDisplay:
             self.epd.init()
             self.epd.Clear()
 
-            # Load fonts (adjust paths as needed for your system)
+            # Load Digital-7 Mono font for e-paper (monospace digital display look)
             font_path_options = [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-                "/System/Library/Fonts/Helvetica.ttc",  # macOS
-                "C:\\Windows\\Fonts\\arial.ttf",  # Windows
+                "/home/pi/.local/share/fonts/Digital-7-Mono.ttf",  # Raspberry Pi user fonts
+                "/usr/local/share/fonts/Digital-7-Mono.ttf",  # System-wide fonts
+                "/usr/share/fonts/truetype/Digital-7-Mono.ttf",
+                "./fonts/Digital-7-Mono.ttf",  # Local fonts directory
+                "fonts/Digital-7-Mono.ttf",
             ]
 
             font_path = None
             for path in font_path_options:
                 if os.path.exists(path):
                     font_path = path
+                    logging.info(f"Loaded font from: {font_path}")
                     break
 
             if font_path:
                 self.font_large = ImageFont.truetype(font_path, 48)
-                self.font_medium = ImageFont.truetype(font_path, 32)
-                self.font_small = ImageFont.truetype(font_path, 20)
+                self.font_medium = ImageFont.truetype(font_path, 36)
+                self.font_small = ImageFont.truetype(font_path, 24)
             else:
                 # Fallback to default font
+                logging.warning("Digital-7-Mono font not found, using default font")
                 self.font_large = ImageFont.load_default()
                 self.font_medium = ImageFont.load_default()
                 self.font_small = ImageFont.load_default()

@@ -1,0 +1,144 @@
+"""E-paper display handler for temperature sensor values."""
+
+from __future__ import annotations
+
+import os
+import sys
+import logging
+from typing import List, Optional
+from datetime import datetime
+
+from PIL import Image, ImageDraw, ImageFont
+
+try:
+    from waveshare_epd import epd7in5_V2
+    HAS_EPAPER = True
+except ImportError:
+    HAS_EPAPER = False
+
+
+class EpaperDisplay:
+    """Handler for 7.5inch e-paper display (waveshare EPD)."""
+
+    def __init__(self, width: int = 800, height: int = 480):
+        self.width = width
+        self.height = height
+        self.epd = None
+        self.font_large = None
+        self.font_medium = None
+        self.font_small = None
+        self.available = False
+        self.last_readings: List[Optional[float]] = []
+        self.last_update_time = None
+
+        if HAS_EPAPER:
+            self._init_epaper()
+
+    def _init_epaper(self) -> None:
+        """Initialize e-paper display and fonts."""
+        try:
+            logging.info("Initializing e-paper display...")
+            self.epd = epd7in5_V2.EPD()
+            self.epd.init()
+            self.epd.Clear()
+
+            # Load Digital-7 Mono font for e-paper (monospace digital display look)
+            font_path_options = [
+                "/home/pi/.local/share/fonts/Digital-7-Mono.ttf",  # Raspberry Pi user fonts
+                "/usr/local/share/fonts/Digital-7-Mono.ttf",  # System-wide fonts
+                "/usr/share/fonts/truetype/Digital-7-Mono.ttf",
+                "./fonts/Digital-7-Mono.ttf",  # Local fonts directory
+                "fonts/Digital-7-Mono.ttf",
+            ]
+
+            font_path = None
+            for path in font_path_options:
+                if os.path.exists(path):
+                    font_path = path
+                    logging.info(f"Loaded font from: {font_path}")
+                    break
+
+            if font_path:
+                self.font_large = ImageFont.truetype(font_path, 48)
+                self.font_medium = ImageFont.truetype(font_path, 36)
+                self.font_small = ImageFont.truetype(font_path, 24)
+            else:
+                # Fallback to default font
+                logging.warning("Digital-7-Mono font not found, using default font")
+                self.font_large = ImageFont.load_default()
+                self.font_medium = ImageFont.load_default()
+                self.font_small = ImageFont.load_default()
+                self.font_medium = ImageFont.load_default()
+                self.font_small = ImageFont.load_default()
+
+            self.available = True
+            logging.info("E-paper display initialized successfully")
+        except Exception as e:
+            logging.warning(f"E-paper display not available: {e}")
+            self.available = False
+
+    def display_readings(self, readings: List[float], title: str = "Temperature Logger") -> None:
+        """Display temperature readings on e-paper screen."""
+        if not self.available or not self.epd:
+            return
+
+        try:
+            self.last_readings = readings
+            self.last_update_time = datetime.now()
+
+            # Create image
+            image = Image.new("1", (self.width, self.height), 255)  # White background
+            draw = ImageDraw.Draw(image)
+
+            # Draw title
+            draw.text((10, 10), title, font=self.font_large, fill=0)
+
+            # Draw timestamp
+            timestamp = self.last_update_time.strftime("%H:%M:%S")
+            draw.text((10, 65), f"Updated: {timestamp}", font=self.font_small, fill=0)
+
+            # Draw horizontal line
+            draw.line((10, 95, self.width - 10, 95), fill=0, width=2)
+
+            # Display readings in a grid (2 columns)
+            y_pos = 110
+            for idx, reading in enumerate(readings):
+                col = idx % 2
+                row = idx // 2
+
+                x_pos = 20 + col * (self.width // 2)
+                y_pos_current = 110 + row * 70
+
+                # Channel label
+                label = f"CH {idx + 1}:"
+                draw.text((x_pos, y_pos_current), label, font=self.font_medium, fill=0)
+
+                # Temperature value
+                if isinstance(reading, float) and not float('nan'):
+                    value_text = f"{reading:.1f}°C"
+                else:
+                    value_text = "-- °C"
+                draw.text((x_pos + 150, y_pos_current), value_text, font=self.font_medium, fill=0)
+
+            # Display image on e-paper
+            self.epd.display_Partial(self.epd.getbuffer(image), 0, 0, self.width, self.height)
+
+        except Exception as e:
+            logging.error(f"Error displaying on e-paper: {e}")
+
+    def clear(self) -> None:
+        """Clear the e-paper display."""
+        if self.available and self.epd:
+            try:
+                self.epd.init()
+                self.epd.Clear()
+            except Exception as e:
+                logging.error(f"Error clearing e-paper: {e}")
+
+    def sleep(self) -> None:
+        """Put e-paper display into sleep mode."""
+        if self.available and self.epd:
+            try:
+                self.epd.sleep()
+            except Exception as e:
+                logging.error(f"Error putting e-paper to sleep: {e}")

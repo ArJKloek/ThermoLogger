@@ -6,14 +6,15 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFontDatabase
 from PyQt6 import uic
 
-from thermo_worker import ThermoThread
-from epaper_display import EpaperDisplay
+from backend.thermo_worker import ThermoThread
+from backend.epaper_display import EpaperDisplay
 
 
 def load_fonts():
-    """Load custom fonts from the fonts directory."""
+    """Load custom fonts from the fonts directory and system."""
     fonts_dir = Path(__file__).parent / "fonts"
     
+    # Try to load fonts from local fonts directory
     if fonts_dir.exists():
         for font_file in fonts_dir.glob("*.ttf"):
             font_id = QFontDatabase.addApplicationFont(str(font_file))
@@ -23,6 +24,22 @@ def load_fonts():
                 print(f"Failed to load font: {font_file.name}")
     else:
         print(f"Fonts directory not found at {fonts_dir}")
+    
+    # Try to load system fonts for Raspberry Pi
+    system_font_paths = [
+        "/usr/share/fonts/truetype/dejavu/",
+        "/usr/share/fonts/truetype/liberation/",
+    ]
+    
+    for font_dir in system_font_paths:
+        if Path(font_dir).exists():
+            for font_file in Path(font_dir).glob("*.ttf"):
+                try:
+                    font_id = QFontDatabase.addApplicationFont(str(font_file))
+                    if font_id >= 0:
+                        print(f"Loaded system font: {font_file.name}")
+                except Exception as e:
+                    pass
 
 
 class SensorWidget(QWidget):
