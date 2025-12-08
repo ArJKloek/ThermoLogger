@@ -30,6 +30,9 @@ class EpaperDisplay:
         self.available = False
         self.last_readings: List[Optional[float]] = []
         self.last_update_time = None
+        self.initialized = False
+        self.data_start_y = 110  # Y position where temperature data starts
+        self.data_height = 360  # Height of data region (4 rows * 70 pixels + margin)
 
         if HAS_EPAPER:
             self._init_epaper()
@@ -75,8 +78,32 @@ class EpaperDisplay:
             logging.warning(f"E-paper display not available: {e}")
             self.available = False
 
-    def display_readings(self, readings: List[float], title: str = "Temperature Logger") -> None:
-        """Display temperature readings on e-paper screen."""
+    def init_display(self, title: str = "Temperature Logger") -> None:
+        """Initialize the display with static header (title, timestamp line, separator)."""
+        if not self.available or not self.epd:
+            return
+
+        try:
+            # Create full image with header
+            image = Image.new("1", (self.width, self.height), 255)  # White background
+            draw = ImageDraw.Draw(image)
+
+            # Draw title
+            draw.text((10, 10), title, font=self.font_large, fill=0)
+
+            # Draw horizontal line
+            draw.line((10, 95, self.width - 10, 95), fill=0, width=2)
+
+            # Do a full refresh for initial setup
+            self.epd.init()
+            self.epd.display(self.epd.getbuffer(image))
+            self.initialized = True
+            logging.info("E-paper display header initialized")
+        except Exception as e:
+            logging.error(f"Error initializing e-paper display: {e}")
+
+    def display_readings(self, readings: List[float]) -> None:
+        """Update only temperature readings with partial refresh (fast update)."""
         if not self.available or not self.epd:
             return
 
@@ -84,28 +111,25 @@ class EpaperDisplay:
             self.last_readings = readings
             self.last_update_time = datetime.now()
 
-            # Create image
+            # If not yet initialized, do full init first
+            if not self.initialized:
+                self.init_display()
+
+            # Create image for data region only (white background)
             image = Image.new("1", (self.width, self.height), 255)  # White background
             draw = ImageDraw.Draw(image)
 
-            # Draw title
-            draw.text((10, 10), title, font=self.font_large, fill=0)
-
-            # Draw timestamp
+            # Draw timestamp in update region
             timestamp = self.last_update_time.strftime("%H:%M:%S")
             draw.text((10, 65), f"Updated: {timestamp}", font=self.font_small, fill=0)
 
-            # Draw horizontal line
-            draw.line((10, 95, self.width - 10, 95), fill=0, width=2)
-
             # Display readings in a grid (2 columns)
-            y_pos = 110
             for idx, reading in enumerate(readings):
                 col = idx % 2
                 row = idx // 2
 
                 x_pos = 20 + col * (self.width // 2)
-                y_pos_current = 110 + row * 70
+                y_pos_current = self.data_start_y + row * 70
 
                 # Channel label
                 label = f"CH {idx + 1}:"
@@ -118,8 +142,16 @@ class EpaperDisplay:
                     value_text = "-- °C"
                 draw.text((x_pos + 150, y_pos_current), value_text, font=self.font_medium, fill=0)
 
-            # Display image on e-paper
-            self.epd.display_Partial(self.epd.getbuffer(image), 0, 0, self.width, self.height)
+            # Partial refresh: only update the data region (faster)
+            # Update from y=60 (timestamp) through the data region
+            self.epd.init_part()
+            self.epd.display_Partial(
+                self.epd.getbuffer(image),
+                0,
+                60,
+                self.width,
+                self.data_height + 60
+            )
 
         except Exception as e:
             logging.error(f"Error displaying on e-paper: {e}")
@@ -130,6 +162,7 @@ class EpaperDisplay:
             try:
                 self.epd.init()
                 self.epd.Clear()
+                self.initialized = False
             except Exception as e:
                 logging.error(f"Error clearing e-paper: {e}")
 
@@ -140,3 +173,4 @@ class EpaperDisplay:
                 self.epd.sleep()
             except Exception as e:
                 logging.error(f"Error putting e-paper to sleep: {e}")
+

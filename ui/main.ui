@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>ThermoLogger</string>
   </property>
   <widget class="QWidget" name="centralwidget"/>
   <widget class="QMenuBar" name="menubar">
@@ -23,8 +23,80 @@
      <height>27</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menuLogging">
+    <property name="title">
+     <string>Logging</string>
+    </property>
+    <widget class="QMenu" name="menuTimelogging">
+     <property name="title">
+      <string>Timelogging</string>
+     </property>
+     <addaction name="action5_sec"/>
+     <addaction name="action20"/>
+     <addaction name="action1_min"/>
+    </widget>
+    <addaction name="actionStart"/>
+    <addaction name="actionStop"/>
+    <addaction name="actionReset"/>
+    <addaction name="menuTimelogging"/>
+   </widget>
+   <widget class="QMenu" name="menuSettings">
+    <property name="title">
+     <string>Settings</string>
+    </property>
+   </widget>
+   <addaction name="menuLogging"/>
+   <addaction name="menuSettings"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <action name="actionStart">
+   <property name="text">
+    <string>Start</string>
+   </property>
+  </action>
+  <action name="actionStop">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Stop</string>
+   </property>
+  </action>
+  <action name="actionReset">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Reset</string>
+   </property>
+  </action>
+  <action name="action5_sec">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>5 sec</string>
+   </property>
+  </action>
+  <action name="action20">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>20 sec</string>
+   </property>
+  </action>
+  <action name="action1_min">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>1 min</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>
