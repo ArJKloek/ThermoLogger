@@ -31,6 +31,7 @@ class EpaperDisplay:
         self.last_readings: List[Optional[float]] = []
         self.last_update_time = None
         self.initialized = False
+        self.partial_mode_active = False  # Track if we're in partial update mode
         self.data_start_y = 110  # Y position where temperature data starts
         self.data_height = 360  # Height of data region (4 rows * 70 pixels + margin)
 
@@ -94,13 +95,19 @@ class EpaperDisplay:
             # Draw horizontal line
             draw.line((10, 95, self.width - 10, 95), fill=0, width=2)
 
-            # Do a full refresh for initial setup with init_fast
+            # Do a full refresh for initial setup with init_fast (faster than init)
             self.epd.init_fast()
             self.epd.display(self.epd.getbuffer(image))
+            
+            # Now switch to partial mode for future updates
+            self.epd.init_part()
+            self.partial_mode_active = True
             self.initialized = True
-            logging.info("E-paper display header initialized")
+            logging.info("E-paper display header initialized and switched to partial mode")
+            print("[EPAPER] Display initialized, switched to partial update mode")
         except Exception as e:
             logging.error(f"Error initializing e-paper display: {e}")
+            print(f"[EPAPER ERROR] {e}")
 
     def display_readings(self, readings: List[float]) -> None:
         """Update only temperature readings with partial refresh (fast update)."""
@@ -114,8 +121,7 @@ class EpaperDisplay:
             # If not yet initialized, do full init first
             if not self.initialized:
                 self.init_display()
-                # After init_display, we need to call init_part for partial updates
-                self.epd.init_part()
+                return  # Return after init, next call will do the update
 
             # Create full image (we need the full canvas for getbuffer)
             image = Image.new("1", (self.width, self.height), 255)  # White background
@@ -150,7 +156,7 @@ class EpaperDisplay:
                     value_text = "-- °C"
                 draw.text((x_pos + 150, y_pos_current), value_text, font=self.font_medium, fill=0)
 
-            # Partial refresh the full screen (like the example does)
+            # Partial refresh the full screen (partial mode was already activated in init_display)
             self.epd.display_Partial(
                 self.epd.getbuffer(image),
                 0,
@@ -158,9 +164,11 @@ class EpaperDisplay:
                 self.width,
                 self.height
             )
+            print(f"[EPAPER] Updated display at {timestamp}")
 
         except Exception as e:
             logging.error(f"Error displaying on e-paper: {e}")
+            print(f"[EPAPER ERROR] {e}")
 
     def clear(self) -> None:
         """Clear the e-paper display."""
@@ -169,6 +177,7 @@ class EpaperDisplay:
                 self.epd.init()
                 self.epd.Clear()
                 self.initialized = False
+                self.partial_mode_active = False
             except Exception as e:
                 logging.error(f"Error clearing e-paper: {e}")
 
