@@ -130,7 +130,8 @@ class EpaperDisplay:
 
     def display_readings(self, readings: List[float]) -> None:
         """Update only temperature readings with partial refresh (fast update)."""
-        print(f"[EPAPER] display_readings called, available={self.available}, initialized={self.initialized}")
+        print(f"[EPAPER] display_readings called with {len(readings)} readings: {[f'{r:.1f}' for r in readings[:3]]}...")
+        print(f"[EPAPER] available={self.available}, initialized={self.initialized}")
         
         if not self.available or not self.epd:
             print(f"[EPAPER] Skipping - available={self.available}, epd={self.epd is not None}")
