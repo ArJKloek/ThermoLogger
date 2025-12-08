@@ -234,10 +234,10 @@ class EpaperDisplay:
                 # Draw unit (°C) in small font as indicator, positioned higher
                 draw.text((x_pos + 320, y_pos_current + 5), unit_text, font=self.font_unit, fill=0)
                 
-                # Draw thermocouple type below the unit in italic, smaller font
+                # Draw thermocouple type below the unit in italic, smaller font - aligned with bottom of unit
                 if self.settings_manager:
                     tc_type = self.settings_manager.get_channel_type(idx)
-                    draw.text((x_pos + 320, y_pos_current + 25), tc_type, font=self.font_tc_type, fill=0)
+                    draw.text((x_pos + 320, y_pos_current + 35), tc_type, font=self.font_tc_type, fill=0)
 
             # Partial refresh the full screen (partial mode was already activated in init_display)
             self.epd.display_Partial(
