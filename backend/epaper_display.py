@@ -158,10 +158,11 @@ class EpaperDisplay:
         if last_log_time:
             self.last_log_time = last_log_time
 
-    def display_readings(self, readings: List[float]) -> None:
-        """Update only temperature readings with partial refresh (fast update)."""
+    def display_readings(self, readings: List[float]):
+        """Update only temperature readings with partial refresh (fast update).
+        Returns the PIL Image that was displayed."""
         if not self.available or not self.epd:
-            return
+            return None
 
         try:
             self.last_readings = readings
@@ -170,7 +171,7 @@ class EpaperDisplay:
             # If not yet initialized, do full init first
             if not self.initialized:
                 self.init_display()
-                return  # Return after init, next call will do the update
+                return None  # Return after init, next call will do the update
             
             # Create full image (we need the full canvas for getbuffer)
             image = Image.new("1", (self.width, self.height), 255)  # White background
@@ -235,12 +236,15 @@ class EpaperDisplay:
                 self.width,
                 self.height
             )
+            
+            return image  # Return the image for preview
 
         except Exception as e:
             logging.error(f"Error displaying on e-paper: {e}")
             print(f"[EPAPER ERROR] {e}")
             import traceback
             traceback.print_exc()
+            return None
 
     def clear(self) -> None:
         """Clear the e-paper display."""

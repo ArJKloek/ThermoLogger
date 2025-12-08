@@ -1,9 +1,9 @@
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QGridLayout
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QGridLayout, QLabel
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFontDatabase
+from PyQt5.QtGui import QFontDatabase, QPixmap, QImage, QPainter, QFont
 from PyQt5 import uic
 
 from backend.thermo_worker import ThermoThread
@@ -83,6 +83,35 @@ class SensorWidget(QWidget):
             self.label_value.setText(text)
 
 
+class EpaperPreviewWindow(QWidget):
+    """Preview window showing what's displayed on the e-paper."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("E-Paper Display Preview")
+        self.setGeometry(150, 150, 800, 480)
+        
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        
+        # Label to show the preview image
+        self.preview_label = QLabel()
+        self.preview_label.setAlignment(Qt.AlignCenter)
+        self.preview_label.setStyleSheet("background-color: white; border: 2px solid black;")
+        layout.addWidget(self.preview_label)
+        
+    def update_preview(self, image):
+        """Update the preview with a PIL Image."""
+        if image:
+            # Convert PIL Image to QPixmap
+            # PIL image is mode "1" (1-bit), convert to RGB for display
+            rgb_image = image.convert("RGB")
+            data = rgb_image.tobytes("raw", "RGB")
+            qimage = QImage(data, rgb_image.width, rgb_image.height, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(qimage)
+            self.preview_label.setPixmap(pixmap)
+
+
 class MainWindow(QMainWindow):
     """Main application window for Atlas Logger."""
     
@@ -100,6 +129,11 @@ class MainWindow(QMainWindow):
         self.logging_timer = QTimer()
         self.logging_timer.timeout.connect(self.on_logging_timer)
         self.logging_interval = 5  # Default 5 seconds
+        
+        # Create e-paper preview window
+        self.preview_window = EpaperPreviewWindow()
+        self.preview_window.show()
+        
         self.init_ui()
     
     def init_ui(self):
@@ -184,7 +218,9 @@ class MainWindow(QMainWindow):
     def update_epaper_display(self):
         """Update e-paper display with current readings."""
         if self.last_readings:
-            self.epaper.display_readings(self.last_readings)
+            image = self.epaper.display_readings(self.last_readings)
+            if image and self.preview_window:
+                self.preview_window.update_preview(image)
 
     def connect_logging_controls(self):
         """Connect menu actions to their respective handlers."""
