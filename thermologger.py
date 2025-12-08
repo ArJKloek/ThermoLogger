@@ -1,10 +1,10 @@
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QGridLayout
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFontDatabase
-from PyQt6 import uic
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QGridLayout
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QFontDatabase
+from PyQt5 import uic
 
 from backend.thermo_worker import ThermoThread
 from backend.epaper_display import EpaperDisplay
@@ -284,7 +284,7 @@ def main():
     window.show()
     
     # Run the application
-    sys.exit(app.exec())
+    sys.exit(app.exec_())
 
 
 if __name__ == "__main__":

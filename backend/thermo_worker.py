@@ -5,7 +5,7 @@ import random
 import time
 from typing import List
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal
 
 try:
     from perlin_noise import PerlinNoise
