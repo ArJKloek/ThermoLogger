@@ -152,11 +152,7 @@ class EpaperDisplay:
 
     def display_readings(self, readings: List[float]) -> None:
         """Update only temperature readings with partial refresh (fast update)."""
-        print(f"[EPAPER] display_readings called with {len(readings)} readings: {[f'{r:.1f}' for r in readings[:3]]}...")
-        print(f"[EPAPER] available={self.available}, initialized={self.initialized}")
-        
         if not self.available or not self.epd:
-            print(f"[EPAPER] Skipping - available={self.available}, epd={self.epd is not None}")
             return
 
         try:
@@ -165,11 +161,8 @@ class EpaperDisplay:
 
             # If not yet initialized, do full init first
             if not self.initialized:
-                print("[EPAPER] Not initialized, calling init_display()")
                 self.init_display()
                 return  # Return after init, next call will do the update
-
-            print(f"[EPAPER] Drawing {len(readings)} temperature readings...")
             
             # Create full image (we need the full canvas for getbuffer)
             image = Image.new("1", (self.width, self.height), 255)  # White background
@@ -215,7 +208,6 @@ class EpaperDisplay:
                 # Draw unit (°C) in standard font right after the number
                 draw.text((x_pos + 280, y_pos_current), unit_text, font=self.font_medium, fill=0)
 
-            print("[EPAPER] Calling display_Partial...")
             # Partial refresh the full screen (partial mode was already activated in init_display)
             self.epd.display_Partial(
                 self.epd.getbuffer(image),
@@ -224,7 +216,6 @@ class EpaperDisplay:
                 self.width,
                 self.height
             )
-            print(f"[EPAPER] Updated display at {timestamp}")
 
         except Exception as e:
             logging.error(f"Error displaying on e-paper: {e}")
