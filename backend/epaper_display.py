@@ -94,8 +94,8 @@ class EpaperDisplay:
             # Draw horizontal line
             draw.line((10, 95, self.width - 10, 95), fill=0, width=2)
 
-            # Do a full refresh for initial setup
-            self.epd.init()
+            # Do a full refresh for initial setup with init_fast
+            self.epd.init_fast()
             self.epd.display(self.epd.getbuffer(image))
             self.initialized = True
             logging.info("E-paper display header initialized")
@@ -114,10 +114,18 @@ class EpaperDisplay:
             # If not yet initialized, do full init first
             if not self.initialized:
                 self.init_display()
+                # After init_display, we need to call init_part for partial updates
+                self.epd.init_part()
 
-            # Create image for data region only (white background)
+            # Create full image (we need the full canvas for getbuffer)
             image = Image.new("1", (self.width, self.height), 255)  # White background
             draw = ImageDraw.Draw(image)
+
+            # Redraw the title (needed for full image buffer)
+            draw.text((10, 10), "Temperature Logger", font=self.font_large, fill=0)
+
+            # Draw horizontal line
+            draw.line((10, 95, self.width - 10, 95), fill=0, width=2)
 
             # Draw timestamp in update region
             timestamp = self.last_update_time.strftime("%H:%M:%S")
@@ -142,15 +150,13 @@ class EpaperDisplay:
                     value_text = "-- °C"
                 draw.text((x_pos + 150, y_pos_current), value_text, font=self.font_medium, fill=0)
 
-            # Partial refresh: only update the data region (faster)
-            # Update from y=60 (timestamp) through the data region
-            self.epd.init_part()
+            # Partial refresh the full screen (like the example does)
             self.epd.display_Partial(
                 self.epd.getbuffer(image),
                 0,
-                60,
+                0,
                 self.width,
-                self.data_height + 60
+                self.height
             )
 
         except Exception as e:
