@@ -27,14 +27,16 @@ except Exception as e:
 class EpaperDisplay:
     """Handler for 7.5inch e-paper display (waveshare EPD)."""
 
-    def __init__(self, width: int = 800, height: int = 480):
+    def __init__(self, width: int = 800, height: int = 480, settings_manager=None):
         self.width = width
         self.height = height
         self.epd = None
+        self.settings_manager = settings_manager
         # Standard fonts for headers and labels
         self.font_large = None
         self.font_medium = None
         self.font_small = None
+        self.font_unit = None
         # Digital-7 Mono fonts for temperature values only
         self.font_digital_large = None
         self.font_digital_medium = None
@@ -229,6 +231,11 @@ class EpaperDisplay:
                 draw.text((x_pos + 150, y_pos_current), value_text, font=self.font_digital_medium, fill=0)
                 # Draw unit (°C) in small font as indicator, positioned higher
                 draw.text((x_pos + 320, y_pos_current + 5), unit_text, font=self.font_unit, fill=0)
+                
+                # Draw thermocouple type below the unit
+                if self.settings_manager:
+                    tc_type = self.settings_manager.get_channel_type(idx)
+                    draw.text((x_pos + 320, y_pos_current + 25), f"({tc_type})", font=self.font_unit, fill=0)
 
             # Partial refresh the full screen (partial mode was already activated in init_display)
             self.epd.display_Partial(

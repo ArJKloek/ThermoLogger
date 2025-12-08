@@ -123,7 +123,7 @@ class MainWindow(QMainWindow):
         self.sensors = []
         self.worker = None
         self.settings_manager = SettingsManager()
-        self.epaper = EpaperDisplay()
+        self.epaper = EpaperDisplay(settings_manager=self.settings_manager)
         self.logger = ThermoLogger()
         self.last_readings = []
         self.epaper_update_timer = QTimer()
