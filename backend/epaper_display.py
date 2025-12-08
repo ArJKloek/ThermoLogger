@@ -41,10 +41,16 @@ class EpaperDisplay:
     def _init_epaper(self) -> None:
         """Initialize e-paper display and fonts."""
         try:
+            print("[EPAPER] Starting initialization...")
             logging.info("Initializing e-paper display...")
             self.epd = epd7in5_V2.EPD()
+            print("[EPAPER] EPD object created")
+            
             self.epd.init()
+            print("[EPAPER] EPD init() called")
+            
             self.epd.Clear()
+            print("[EPAPER] EPD cleared")
 
             # Load Digital-7 Mono font for e-paper (monospace digital display look)
             font_path_options = [
@@ -60,6 +66,7 @@ class EpaperDisplay:
                 if os.path.exists(path):
                     font_path = path
                     logging.info(f"Loaded font from: {font_path}")
+                    print(f"[EPAPER] Loaded font from: {font_path}")
                     break
 
             if font_path:
@@ -69,14 +76,17 @@ class EpaperDisplay:
             else:
                 # Fallback to default font
                 logging.warning("Digital-7-Mono font not found, using default font")
+                print("[EPAPER] Digital-7-Mono font not found, using default font")
                 self.font_large = ImageFont.load_default()
                 self.font_medium = ImageFont.load_default()
                 self.font_small = ImageFont.load_default()
 
             self.available = True
             logging.info("E-paper display initialized successfully")
+            print("[EPAPER] Initialization complete - display is available")
         except Exception as e:
             logging.warning(f"E-paper display not available: {e}")
+            print(f"[EPAPER ERROR] Initialization failed: {e}")
             self.available = False
 
     def init_display(self, title: str = "Temperature Logger") -> None:
@@ -111,7 +121,10 @@ class EpaperDisplay:
 
     def display_readings(self, readings: List[float]) -> None:
         """Update only temperature readings with partial refresh (fast update)."""
+        print(f"[EPAPER] display_readings called, available={self.available}, initialized={self.initialized}")
+        
         if not self.available or not self.epd:
+            print(f"[EPAPER] Skipping - available={self.available}, epd={self.epd is not None}")
             return
 
         try:
@@ -120,9 +133,12 @@ class EpaperDisplay:
 
             # If not yet initialized, do full init first
             if not self.initialized:
+                print("[EPAPER] Not initialized, calling init_display()")
                 self.init_display()
                 return  # Return after init, next call will do the update
 
+            print(f"[EPAPER] Drawing {len(readings)} temperature readings...")
+            
             # Create full image (we need the full canvas for getbuffer)
             image = Image.new("1", (self.width, self.height), 255)  # White background
             draw = ImageDraw.Draw(image)
@@ -156,6 +172,7 @@ class EpaperDisplay:
                     value_text = "-- °C"
                 draw.text((x_pos + 150, y_pos_current), value_text, font=self.font_medium, fill=0)
 
+            print("[EPAPER] Calling display_Partial...")
             # Partial refresh the full screen (partial mode was already activated in init_display)
             self.epd.display_Partial(
                 self.epd.getbuffer(image),
@@ -169,6 +186,8 @@ class EpaperDisplay:
         except Exception as e:
             logging.error(f"Error displaying on e-paper: {e}")
             print(f"[EPAPER ERROR] {e}")
+            import traceback
+            traceback.print_exc()
 
     def clear(self) -> None:
         """Clear the e-paper display."""
