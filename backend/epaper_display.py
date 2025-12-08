@@ -197,17 +197,23 @@ class EpaperDisplay:
                 label = f"CH {idx + 1}:"
                 draw.text((x_pos, y_pos_current), label, font=self.font_medium, fill=0)
 
-                # Temperature value (Digital-7 Mono font)
+                # Temperature value (Digital-7 Mono font for number, standard font for unit)
                 try:
                     temp_val = float(reading)
                     if not math.isnan(temp_val):
-                        value_text = f"{temp_val:.1f}°C"
+                        value_text = f"{temp_val:.1f}"
+                        unit_text = "°C"
                     else:
-                        value_text = "-- °C"
+                        value_text = "--"
+                        unit_text = "°C"
                 except (TypeError, ValueError):
-                    value_text = "-- °C"
+                    value_text = "--"
+                    unit_text = "°C"
                 
+                # Draw temperature number in Digital-7 Mono
                 draw.text((x_pos + 150, y_pos_current), value_text, font=self.font_digital_medium, fill=0)
+                # Draw unit (°C) in standard font right after the number
+                draw.text((x_pos + 280, y_pos_current), unit_text, font=self.font_medium, fill=0)
 
             print("[EPAPER] Calling display_Partial...")
             # Partial refresh the full screen (partial mode was already activated in init_display)
