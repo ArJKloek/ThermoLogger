@@ -213,6 +213,11 @@ class EpaperDisplay:
                 # Channel label (standard font)
                 label = f"CH {idx + 1}:"
                 draw.text((x_pos, y_pos_current), label, font=self.font_medium, fill=0)
+                
+                # Thermocouple type below channel label
+                if self.settings_manager:
+                    tc_type = self.settings_manager.get_channel_type(idx)
+                    draw.text((x_pos, y_pos_current + 30), f"Type {tc_type}", font=self.font_small, fill=0)
 
                 # Temperature value (Digital-7 Mono font for number, standard font for unit)
                 try:
@@ -231,11 +236,6 @@ class EpaperDisplay:
                 draw.text((x_pos + 150, y_pos_current), value_text, font=self.font_digital_medium, fill=0)
                 # Draw unit (°C) in small font as indicator, positioned higher
                 draw.text((x_pos + 320, y_pos_current + 5), unit_text, font=self.font_unit, fill=0)
-                
-                # Draw thermocouple type below the unit
-                if self.settings_manager:
-                    tc_type = self.settings_manager.get_channel_type(idx)
-                    draw.text((x_pos + 320, y_pos_current + 25), f"({tc_type})", font=self.font_unit, fill=0)
 
             # Partial refresh the full screen (partial mode was already activated in init_display)
             self.epd.display_Partial(
