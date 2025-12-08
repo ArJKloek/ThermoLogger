@@ -68,9 +68,11 @@ class EpaperDisplay:
             project_root = Path(__file__).parent.parent
             
             font_path_options = [
+                project_root / "fonts" / "Digital-7-Mono.ttf",
                 project_root / "fonts" / "Digital-7 Mono.ttf",
                 project_root / "fonts" / "digital-7-mono.ttf",
-                project_root / "fonts" / "Digital-7-Mono.ttf",
+                Path.home() / ".local/share/fonts/digital-7-Mono.ttf",  # User fonts (~/.)
+                "/home/pi/ThermoLogger/fonts/Digital-7-Mono.ttf",  # Local project fonts on Pi
                 "/home/pi/.local/share/fonts/Digital-7-Mono.ttf",  # Raspberry Pi user fonts
                 "/usr/local/share/fonts/Digital-7-Mono.ttf",  # System-wide fonts
                 "/usr/share/fonts/truetype/Digital-7-Mono.ttf",
