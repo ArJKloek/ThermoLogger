@@ -246,6 +246,15 @@ class EpaperDisplay:
 
         vmin, vmax = 0, 150
 
+        # Dynamic temp scale: find min/max from data, with some padding
+        flat_vals = [v for series in series_values for v in series if isinstance(v, (int, float)) and not math.isnan(v)]
+        if flat_vals:
+            data_min = min(flat_vals)
+            data_max = max(flat_vals)
+            padding = (data_max - data_min) * 0.1 if data_max > data_min else 5
+            vmin = max(0, data_min - padding)
+            vmax = min(150, data_max + padding)
+
         # Dynamic time window: use actual data span
         t_min = series_times[0]
         t_max = series_times[-1]
@@ -303,14 +312,15 @@ class EpaperDisplay:
         # Axes and labels
         draw.rectangle([x, y, x + w, y + h], outline=0, width=1)
         
-        # Y-axis: degree labels on the left (5 ticks: 0, 37.5, 75, 112.5, 150)
-        y_ticks = [0, 37.5, 75, 112.5, 150]
+        # Y-axis: 4 degree ticks with dynamic scale
+        y_ticks = [vmin, vmin + (vmax - vmin) * 1/3, vmin + (vmax - vmin) * 2/3, vmax]
         for t in y_ticks:
             ty = y_pos(t)
             if ty is not None:
                 draw.line([x - 3, ty, x, ty], fill=0, width=1)
-                label = f"{int(t)}"
-                draw.text((x - 25, ty - 6), label, font=self.font_small, fill=0)
+                label = f"{int(round(t))}"
+                # Move further left to avoid overlap
+                draw.text((x - 40, ty - 6), label, font=self.font_small, fill=0)
         
         # X-axis: 5 time ticks
         time_points = []
