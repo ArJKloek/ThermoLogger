@@ -236,7 +236,7 @@ class EpaperDisplay:
         for ts, vals in self.history:
             if ts >= cutoff:
                 series_times.append(ts)
-                for si, ch in enabled_indices:
+                for si, ch in enumerate(enabled_indices):
                     if ch < len(vals):
                         v = vals[ch]
                         if isinstance(v, (int, float)):
