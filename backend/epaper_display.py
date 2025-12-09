@@ -15,6 +15,7 @@ import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+import matplotlib.dates as mdates
 import io
 
 try:
@@ -283,8 +284,9 @@ class EpaperDisplay:
         ax.tick_params(axis='both', labelsize=7)
         ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
         
-        # Format time axis
-        ax.xaxis.set_major_locator(plt.MaxNLocator(5))
+        # Format time axis to show clock times (HH:MM)
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=15))
         fig.autofmt_xdate(rotation=0, ha='center')
         
         fig.tight_layout(pad=0.5)
