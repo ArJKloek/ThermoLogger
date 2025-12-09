@@ -11,6 +11,7 @@ from PyQt5 import uic
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+import matplotlib.dates as mdates
 
 from backend.thermo_worker import ThermoThread
 from backend.epaper_display import EpaperDisplay
@@ -91,6 +92,74 @@ class SensorWidget(QWidget):
             self.label_value.setText(text)
 
 
+class PlotWindow(QWidget):
+    """Separate window for displaying temperature plot."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Temperature Plot - Last Hour")
+        self.setGeometry(100, 100, 800, 600)
+        
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+        
+        # Create matplotlib figure and canvas
+        self.fig = Figure(figsize=(8, 6))
+        self.ax = self.fig.add_subplot(111)
+        self.canvas = FigureCanvas(self.fig)
+        layout.addWidget(self.canvas)
+        
+        self.ax.set_title("Last Hour Temperatures")
+        self.ax.set_xlabel("Time")
+        self.ax.set_ylabel("°C")
+        self.fig.autofmt_xdate()
+        
+    def update_plot(self, history, channel_count, settings_manager):
+        """Update the plot with current history data."""
+        if not history:
+            return
+            
+        cutoff = datetime.now() - timedelta(hours=1)
+        times = []
+        values = []
+        
+        # Filter history for last hour
+        for ts, vals in history:
+            if ts >= cutoff:
+                times.append(ts)
+                values.append(vals)
+        
+        if not times:
+            return
+        
+        self.ax.clear()
+        self.ax.set_title("Last Hour Temperatures")
+        self.ax.set_xlabel("Time")
+        self.ax.set_ylabel("°C")
+        
+        enabled_indices = [i for i in range(channel_count) if settings_manager.is_channel_enabled(i)]
+        
+        # Line styles
+        linestyles = ['-', ':', '--', '-.', (0, (3, 1, 1, 1, 1, 1))]
+        
+        # Build series per enabled channel
+        for si, idx in enumerate(enabled_indices):
+            series = [row[idx] for row in values if idx < len(row)]
+            style = linestyles[si % len(linestyles)]
+            self.ax.plot(times, series, label=f"CH{idx + 1}", linestyle=style, linewidth=1.5)
+        
+        if enabled_indices:
+            self.ax.legend(loc="upper left")
+        
+        # Format time axis
+        self.ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+        self.ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=15))
+        
+        self.ax.grid(True, alpha=0.3)
+        self.fig.autofmt_xdate(rotation=0, ha='center')
+        self.canvas.draw()
+
+
 class EpaperPreviewWindow(QWidget):
     """Preview window showing what's displayed on the e-paper."""
     
@@ -146,6 +215,9 @@ class MainWindow(QMainWindow):
             self.preview_window = EpaperPreviewWindow()
             self.preview_window.show()
         
+        # Create plot window (initially hidden)
+        self.plot_window = None
+        
         self.init_ui()
     
     def init_ui(self):
@@ -172,10 +244,9 @@ class MainWindow(QMainWindow):
             self.menubar.setVisible(True)
             print(f"[MENU] Menubar configured: visible={self.menubar.isVisible()}")
         
-        # Build layouts and plot
+        # Build layouts
         self.setup_layouts()
         self.setup_sensors()
-        self.setup_plot()
 
         # Connect menu actions
         self.connect_logging_controls()
@@ -184,19 +255,14 @@ class MainWindow(QMainWindow):
         self.start_worker()
     
     def setup_layouts(self):
-        """Create main layout with sensors on the left and plot on the right."""
-        main_layout = QHBoxLayout()
+        """Create main layout with sensors grid."""
+        main_layout = QVBoxLayout()
         self.centralwidget.setLayout(main_layout)
 
-        # Left: sensors grid
+        # Sensors grid
         self.sensors_container = QWidget()
         self.sensors_layout = QGridLayout(self.sensors_container)
-        main_layout.addWidget(self.sensors_container, stretch=1)
-
-        # Right: plot canvas placeholder
-        self.plot_container = QWidget()
-        self.plot_layout = QVBoxLayout(self.plot_container)
-        main_layout.addWidget(self.plot_container, stretch=1)
+        main_layout.addWidget(self.sensors_container)
 
     def setup_sensors(self):
         """Add multiple sensor widgets to the sensors grid - only enabled channels."""
@@ -235,7 +301,9 @@ class MainWindow(QMainWindow):
                 if self.settings_manager.is_channel_enabled(idx):
                     self.sensors[idx].update_value(value)
 
-        self.update_plot()
+        # Update plot window if open
+        if self.plot_window and self.plot_window.isVisible():
+            self.plot_window.update_plot(self.history, self.channel_count, self.settings_manager)
 
     def on_source_changed(self, source: str):
         message = f"Reading source: {source}"
@@ -256,51 +324,18 @@ class MainWindow(QMainWindow):
             if image and self.preview_window:
                 self.preview_window.update_preview(image)
 
-    def setup_plot(self):
-        """Initialize matplotlib figure and canvas."""
-        self.fig = Figure(figsize=(5, 4))
-        self.ax = self.fig.add_subplot(111)
-        self.canvas = FigureCanvas(self.fig)
-        self.plot_layout.addWidget(self.canvas)
-        self.ax.set_title("Last Hour Temperatures")
-        self.ax.set_xlabel("Time")
-        self.ax.set_ylabel("°C")
-        self.fig.autofmt_xdate()
-
-    def update_plot(self):
-        """Plot last hour of enabled channel data on the right."""
-        if not self.history:
-            return
-        cutoff = datetime.now() - timedelta(hours=1)
-        times = []
-        values = []
-
-        # Filter history for last hour
-        for ts, vals in self.history:
-            if ts >= cutoff:
-                times.append(ts)
-                values.append(vals)
-
-        if not times:
-            return
-
-        self.ax.clear()
-        self.ax.set_title("Last Hour Temperatures")
-        self.ax.set_xlabel("Time")
-        self.ax.set_ylabel("°C")
-
-        enabled_indices = [i for i in range(self.channel_count) if self.settings_manager.is_channel_enabled(i)]
-
-        # Build series per enabled channel
-        for idx in enabled_indices:
-            series = [row[idx] for row in values if idx < len(row)]
-            self.ax.plot(times, series, label=f"CH{idx + 1}")
-
-        if enabled_indices:
-            self.ax.legend(loc="upper left")
-
-        self.fig.autofmt_xdate()
-        self.canvas.draw_idle()
+    def show_plot_window(self):
+        """Open the plot window."""
+        if self.plot_window is None:
+            self.plot_window = PlotWindow()
+        
+        self.plot_window.show()
+        self.plot_window.raise_()
+        self.plot_window.activateWindow()
+        
+        # Update with current data
+        if self.history:
+            self.plot_window.update_plot(self.history, self.channel_count, self.settings_manager)
 
     def connect_logging_controls(self):
         """Connect menu actions to their respective handlers."""
@@ -316,8 +351,10 @@ class MainWindow(QMainWindow):
             self.action20.triggered.connect(lambda: self.set_logging_interval(20))
         if hasattr(self, 'action1_min'):
             self.action1_min.triggered.connect(lambda: self.set_logging_interval(60))
-        if hasattr(self, 'actionConfiguration'):
-            self.actionConfiguration.triggered.connect(self.open_settings)
+        if hasattr(self, 'actionSettings'):
+            self.actionSettings.triggered.connect(self.show_settings)
+        if hasattr(self, 'actionShowPlot'):
+            self.actionShowPlot.triggered.connect(self.show_plot_window)
 
     def open_settings(self):
         """Open the settings dialog."""
