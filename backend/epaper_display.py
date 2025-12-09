@@ -220,14 +220,11 @@ class EpaperDisplay:
         return font_medium, font_unit, font_tc, font_digital
 
     def _draw_plot(self, draw: ImageDraw.ImageDraw, enabled_indices: List[int], x: int, y: int, w: int, h: int):
-        """Draw simple line plot of last hour for enabled channels with fixed scale 0-150°C."""
+        """Draw simple line plot of last hour for enabled channels with dynamic scale."""
         if not self.history or not enabled_indices:
             return
 
         cutoff = datetime.now() - timedelta(hours=1)
-        end_time = datetime.now()
-        window_seconds = 3600
-
         series_times = []
         series_values = [[] for _ in enabled_indices]
 
@@ -249,15 +246,20 @@ class EpaperDisplay:
 
         vmin, vmax = 0, 150
 
+        # Dynamic time window: use actual data span
+        t_min = series_times[0]
+        t_max = series_times[-1]
+        t_span = (t_max - t_min).total_seconds()
+        if t_span < 1:
+            t_span = 1
+
         # Downsample to fit width
-        max_points = max(50, w // 4)
+        max_points = max(20, w // 2)
         step = max(1, len(series_times) // max_points)
         indices = range(0, len(series_times), step)
 
         def x_pos(idx):
-            span = max(1, window_seconds)
-            seconds = (series_times[idx] - end_time).total_seconds() + window_seconds
-            return x + int(w * seconds / span)
+            return x + int(w * (series_times[idx] - t_min).total_seconds() / t_span)
 
         def y_pos(val):
             if not isinstance(val, (int, float)) or math.isnan(val):
@@ -300,19 +302,6 @@ class EpaperDisplay:
 
         # Axes and labels
         draw.rectangle([x, y, x + w, y + h], outline=0, width=1)
-        # Y-axis ticks at 0,50,100,150
-        for t in (0, 50, 100, 150):
-            ty = y_pos(t)
-            if ty is not None:
-                draw.line([x - 5, ty, x, ty], fill=0, width=1)
-                draw.text((x - 30, ty - 8), str(t), font=self.font_small, fill=0)
-
-        # X-axis tick at -60, -30, -0 minutes
-        for mins in (60, 30, 0):
-            tx = x + int(w * (3600 - mins * 60) / window_seconds)
-            draw.line([tx, y + h, tx, y + h + 4], fill=0, width=1)
-            label = f"-{mins}m" if mins else "0m"
-            draw.text((tx - 12, y + h + 6), label, font=self.font_small, fill=0)
 
     def display_readings(self, readings: List[float]):
         """Update only temperature readings with partial refresh (fast update).
@@ -363,10 +352,10 @@ class EpaperDisplay:
             enabled_count = len(enabled_indices)
             font_medium, font_unit, font_tc, font_digital = self._select_fonts(enabled_count)
 
-            # Layout split: left for values, right for plot
-            left_width = int(self.width * 0.45)
+            # Layout split: left for values, right for plot (plot 80% smaller)
+            left_width = int(self.width * 0.8)
             right_x = left_width + 10
-            right_width = self.width - right_x - 10
+            right_width = int((self.width - right_x - 10) * 0.2)
 
             # Compute vertical spacing to fit all enabled channels in one column
             available_height = self.height - self.data_start_y - 10
