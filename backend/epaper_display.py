@@ -352,10 +352,11 @@ class EpaperDisplay:
             enabled_count = len(enabled_indices)
             font_medium, font_unit, font_tc, font_digital = self._select_fonts(enabled_count)
 
-            # Layout split: left for values, right for plot (plot 80% smaller)
-            left_width = int(self.width * 0.8)
+            # Layout split: left for values, right for plot (50/50 split)
+            left_width = int(self.width * 0.5)
             right_x = left_width + 10
-            right_width = int((self.width - right_x - 10) * 0.2)
+            right_available = self.width - right_x - 10
+            right_width = int(right_available * 0.8)  # Plot takes 80% of available space
 
             # Compute vertical spacing to fit all enabled channels in one column
             available_height = self.height - self.data_start_y - 10
