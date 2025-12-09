@@ -204,10 +204,16 @@ class EpaperDisplay:
                 status_text = "Logging: OFF"
                 draw.text((250, 65), status_text, font=self.font_small, fill=0)
 
-            # Display readings in a grid (2 columns)
+            # Display readings in a grid (2 columns) - only for enabled channels
+            display_idx = 0  # Track position for display
             for idx, reading in enumerate(readings):
-                col = idx % 2
-                row = idx // 2
+                # Skip disabled channels
+                if self.settings_manager and not self.settings_manager.is_channel_enabled(idx):
+                    continue
+                    
+                col = display_idx % 2
+                row = display_idx // 2
+                display_idx += 1
 
                 x_pos = 20 + col * (self.width // 2)
                 y_pos_current = self.data_start_y + row * 70

@@ -31,9 +31,10 @@ class SettingsDialog(QDialog):
         tc_group.setLayout(tc_layout)
 
         # Add header
-        tc_layout.addWidget(QLabel("<b>Channel</b>"), 0, 0)
-        tc_layout.addWidget(QLabel("<b>Thermocouple Type</b>"), 0, 1)
-        tc_layout.addWidget(QLabel("<b>Temperature Range</b>"), 0, 2)
+        tc_layout.addWidget(QLabel("<b>Enable</b>"), 0, 0)
+        tc_layout.addWidget(QLabel("<b>Channel</b>"), 0, 1)
+        tc_layout.addWidget(QLabel("<b>Thermocouple Type</b>"), 0, 2)
+        tc_layout.addWidget(QLabel("<b>Temperature Range</b>"), 0, 3)
 
         # Temperature ranges for each type
         temp_ranges = {
@@ -47,23 +48,30 @@ class SettingsDialog(QDialog):
             'B': '200°C to 1820°C'
         }
 
-        # Create combo boxes for each channel
+        # Create checkboxes and combo boxes for each channel
+        self.channel_checkboxes = []
         for i in range(8):
+            # Enable checkbox
+            checkbox = QCheckBox()
+            checkbox.setChecked(True)
+            self.channel_checkboxes.append(checkbox)
+            tc_layout.addWidget(checkbox, i + 1, 0, Qt.AlignCenter)
+            
             # Channel label
             channel_label = QLabel(f"CH {i + 1}:")
-            tc_layout.addWidget(channel_label, i + 1, 0)
+            tc_layout.addWidget(channel_label, i + 1, 1)
 
             # Type combo box
             combo = QComboBox()
             combo.addItems(SettingsManager.THERMOCOUPLE_TYPES)
             combo.currentTextChanged.connect(lambda text, idx=i: self.update_range_label(idx, text))
             self.channel_combos.append(combo)
-            tc_layout.addWidget(combo, i + 1, 1)
+            tc_layout.addWidget(combo, i + 1, 2)
 
             # Temperature range label
             range_label = QLabel(temp_ranges['K'])
             range_label.setObjectName(f"range_label_{i}")
-            tc_layout.addWidget(range_label, i + 1, 2)
+            tc_layout.addWidget(range_label, i + 1, 3)
 
         layout.addWidget(tc_group)
 
@@ -141,6 +149,10 @@ class SettingsDialog(QDialog):
                 index = self.channel_combos[i].findText(tc_type)
                 if index >= 0:
                     self.channel_combos[i].setCurrentIndex(index)
+            
+            # Load channel enabled state
+            if i < len(self.channel_checkboxes):
+                self.channel_checkboxes[i].setChecked(self.settings_manager.is_channel_enabled(i))
         
         # Load preview window setting
         self.show_preview_checkbox.setChecked(self.settings_manager.show_preview)
@@ -153,9 +165,15 @@ class SettingsDialog(QDialog):
     def save_settings(self):
         """Save the settings and close dialog."""
         types = [combo.currentText() for combo in self.channel_combos]
+        enabled = [checkbox.isChecked() for checkbox in self.channel_checkboxes]
+        
         self.settings_manager.show_preview = self.show_preview_checkbox.isChecked()
         
+        # Save channel types
         if self.settings_manager.set_all_channel_types(types):
+            # Save channel enabled states
+            for i, is_enabled in enumerate(enabled):
+                self.settings_manager.set_channel_enabled(i, is_enabled)
             if self.settings_manager.save_settings():
                 QMessageBox.information(self, "Settings Saved", 
                                       "Settings have been saved successfully.\n\nRestart the application for preview window changes to take effect.")

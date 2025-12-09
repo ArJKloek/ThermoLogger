@@ -124,7 +124,7 @@ class MainWindow(QMainWindow):
         self.worker = None
         self.settings_manager = SettingsManager()
         self.epaper = EpaperDisplay(settings_manager=self.settings_manager)
-        self.logger = ThermoLogger()
+        self.logger = ThermoLogger(settings_manager=self.settings_manager)
         self.last_readings = []
         self.epaper_update_timer = QTimer()
         self.epaper_update_timer.timeout.connect(self.update_epaper_display)
@@ -183,16 +183,24 @@ class MainWindow(QMainWindow):
         else:
             layout = self.centralwidget.layout()
 
-        # Add sensors in a 2-column grid
+        # Add sensors in a 2-column grid - only enabled channels
+        display_idx = 0
         for idx in range(self.channel_count):
             sensor = SensorWidget(f"Thermocouple {idx + 1}")
-            row = idx // 2
-            col = idx % 2
-            layout.addWidget(sensor, row, col)
             self.sensors.append(sensor)
+            
+            # Only add to layout if enabled
+            if self.settings_manager.is_channel_enabled(idx):
+                row = display_idx // 2
+                col = display_idx % 2
+                layout.addWidget(sensor, row, col)
+                sensor.show()
+                display_idx += 1
+            else:
+                sensor.hide()
 
         # Add stretch at the bottom
-        stretch_row = self.channel_count // 2 + 1
+        stretch_row = (display_idx + 1) // 2 + 1
         layout.setRowStretch(stretch_row, 1)
 
     def start_worker(self):
@@ -207,7 +215,9 @@ class MainWindow(QMainWindow):
         self.last_readings = readings
         for idx, value in enumerate(readings):
             if idx < len(self.sensors):
-                self.sensors[idx].update_value(value)
+                # Only update visible/enabled sensors
+                if self.settings_manager.is_channel_enabled(idx):
+                    self.sensors[idx].update_value(value)
 
     def on_source_changed(self, source: str):
         message = f"Reading source: {source}"

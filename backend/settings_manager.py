@@ -17,6 +17,7 @@ class SettingsManager:
     def __init__(self, settings_file: str | Path = "settings.json"):
         self.settings_file = Path(settings_file)
         self.channel_types: List[str] = [self.DEFAULT_TYPE] * 8
+        self.channel_enabled: List[bool] = [True] * 8  # All channels enabled by default
         self.show_preview: bool = True  # Show e-paper preview by default
         self.load_settings()
 
@@ -31,6 +32,7 @@ class SettingsManager:
             with open(self.settings_file, 'r') as f:
                 data = json.load(f)
                 self.channel_types = data.get('channel_types', [self.DEFAULT_TYPE] * 8)
+                self.channel_enabled = data.get('channel_enabled', [True] * 8)
                 self.show_preview = data.get('show_preview', True)
                 
                 # Ensure we have exactly 8 channels
@@ -38,9 +40,14 @@ class SettingsManager:
                     self.channel_types.append(self.DEFAULT_TYPE)
                 self.channel_types = self.channel_types[:8]
                 
+                while len(self.channel_enabled) < 8:
+                    self.channel_enabled.append(True)
+                self.channel_enabled = self.channel_enabled[:8]
+                
                 logging.info(f"Settings loaded from {self.settings_file}")
                 print(f"[SETTINGS] Loaded from {self.settings_file}")
                 print(f"[SETTINGS] Channel types: {self.channel_types}")
+                print(f"[SETTINGS] Channel enabled: {self.channel_enabled}")
                 return True
         except Exception as e:
             logging.error(f"Error loading settings: {e}")
@@ -52,6 +59,7 @@ class SettingsManager:
         try:
             data = {
                 'channel_types': self.channel_types,
+                'channel_enabled': self.channel_enabled,
                 'show_preview': self.show_preview
             }
             with open(self.settings_file, 'w') as f:
@@ -59,6 +67,7 @@ class SettingsManager:
             logging.info(f"Settings saved to {self.settings_file}")
             print(f"[SETTINGS] Saved to {self.settings_file}")
             print(f"[SETTINGS] Channel types: {self.channel_types}")
+            print(f"[SETTINGS] Channel enabled: {self.channel_enabled}")
             return True
         except Exception as e:
             logging.error(f"Error saving settings: {e}")
@@ -81,6 +90,23 @@ class SettingsManager:
     def get_all_channel_types(self) -> List[str]:
         """Get all channel thermocouple types."""
         return self.channel_types.copy()
+
+    def is_channel_enabled(self, channel: int) -> bool:
+        """Check if a channel is enabled (0-7)."""
+        if 0 <= channel < 8:
+            return self.channel_enabled[channel]
+        return False
+
+    def set_channel_enabled(self, channel: int, enabled: bool) -> bool:
+        """Enable or disable a channel (0-7)."""
+        if 0 <= channel < 8:
+            self.channel_enabled[channel] = enabled
+            return True
+        return False
+
+    def get_enabled_channels(self) -> List[int]:
+        """Get list of enabled channel numbers (0-7)."""
+        return [i for i in range(8) if self.channel_enabled[i]]
 
     def set_all_channel_types(self, types: List[str]) -> bool:
         """Set all channel thermocouple types."""

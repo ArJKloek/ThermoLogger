@@ -12,8 +12,9 @@ from typing import List, Optional
 class ThermoLogger:
     """Handles CSV logging of temperature readings."""
 
-    def __init__(self, data_dir: str | Path = "Data"):
+    def __init__(self, data_dir: str | Path = "Data", settings_manager=None):
         self.data_dir = Path(data_dir)
+        self.settings_manager = settings_manager
         self.csv_file = None
         self.csv_writer = None
         self.is_logging = False
@@ -40,8 +41,14 @@ class ThermoLogger:
             self.csv_file.open("a", newline="").close()  # Ensure file exists
             self.file_handle = open(str(self.csv_file), "a", newline="")
             
-            # Prepare CSV header
-            header = ["Timestamp"] + [f"CH{i+1}" for i in range(self.channels)]
+            # Prepare CSV header - only include enabled channels
+            header = ["Timestamp"]
+            if self.settings_manager:
+                for i in range(self.channels):
+                    if self.settings_manager.is_channel_enabled(i):
+                        header.append(f"CH{i+1}")
+            else:
+                header += [f"CH{i+1}" for i in range(self.channels)]
 
             # Only write header if file is new
             if not file_exists:
@@ -66,13 +73,22 @@ class ThermoLogger:
             return False
 
     def log_reading(self, readings: List[float]) -> None:
-        """Log a temperature reading to CSV."""
+        """Log a temperature reading to CSV - only enabled channels."""
         if not self.is_logging or not self.csv_writer:
             return
 
         try:
             timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-            row = [timestamp] + readings
+            row = [timestamp]
+            
+            # Only log enabled channels
+            if self.settings_manager:
+                for i, temp in enumerate(readings):
+                    if self.settings_manager.is_channel_enabled(i):
+                        row.append(temp)
+            else:
+                row += readings
+                
             self.csv_writer.writerow(row)
             self.file_handle.flush()  # Flush to ensure data is written
         except Exception as e:

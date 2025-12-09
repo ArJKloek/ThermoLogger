@@ -105,9 +105,12 @@ class ThermoThread(QThread):
         if self._startup_error:
             self.error.emit(f"Falling back to dummy: {self._startup_error}")
         
-        noise_source = "Perlin noise" if HAS_PERLIN else "sine wave (fallback)"
         self.source_changed.emit(self.source)
-        self.error.emit(f"Using {noise_source} for dummy data")
+        
+        # Only show noise source info if we're using dummy data
+        if self.source == "dummy":
+            noise_source = "Perlin noise" if HAS_PERLIN else "sine wave (fallback)"
+            self.error.emit(f"Using {noise_source} for dummy data")
 
         while not self._stop:
             readings: List[float] = []
