@@ -158,6 +158,10 @@ class EpaperDisplay:
             return
 
         try:
+            # Load unplugged icon if not already loaded
+            if self.unplugged_icon is None:
+                self._load_unplugged_icon()
+            
             # Create full image with header
             image = Image.new("1", (self.width, self.height), 255)  # White background
             draw = ImageDraw.Draw(image)
@@ -328,9 +332,14 @@ class EpaperDisplay:
                     break
             
             if icon_path:
-                img = Image.open(str(icon_path)).convert("1")  # Convert to 1-bit B&W
+                img = Image.open(str(icon_path))
+                # Convert to RGBA first if needed, then to 1-bit B&W
+                if img.mode != "RGBA":
+                    img = img.convert("RGBA")
                 # Resize to 30x30 pixels
-                self.unplugged_icon = img.resize((30, 30), Image.Resampling.LANCZOS)
+                img = img.resize((30, 30), Image.Resampling.LANCZOS)
+                # Convert to 1-bit for e-paper
+                self.unplugged_icon = img.convert("1")
                 logging.info(f"Loaded unplugged icon from: {icon_path}")
                 print(f"[EPAPER] Loaded unplugged icon: {icon_path}")
             else:
@@ -415,8 +424,14 @@ class EpaperDisplay:
                 # Add unplugged icon or line style indicator below channel label
                 if (idx + 1) in self.unplugged_channels:
                     if self.unplugged_icon:
-                        # Paste the unplugged icon
-                        image.paste(self.unplugged_icon, (x_pos, y_pos_current + 20), self.unplugged_icon)
+                        # Paste the unplugged icon (handle both 1-bit and RGBA formats)
+                        try:
+                            if self.unplugged_icon.mode == "1":
+                                image.paste(self.unplugged_icon, (x_pos, y_pos_current + 20))
+                            else:
+                                image.paste(self.unplugged_icon, (x_pos, y_pos_current + 20), self.unplugged_icon)
+                        except Exception as e:
+                            print(f"[EPAPER] Error pasting icon: {e}")
                 else:
                     style_indicator = linestyle_symbols.get(display_idx % 5, '━')
                     draw.text((x_pos, y_pos_current + 25), style_indicator, font=self.font_small, fill=0)
