@@ -290,6 +290,10 @@ class MainWindow(QMainWindow):
         self.worker.source_changed.connect(self.on_source_changed)
         self.worker.error.connect(self.on_error)
         self.worker.start()
+        
+        # Pass unplugged channels to display after worker initialization
+        if hasattr(self.worker, 'unplugged_channels'):
+            self.epaper.set_unplugged_channels(self.worker.unplugged_channels)
 
     def update_readings(self, readings):
         self.last_readings = readings

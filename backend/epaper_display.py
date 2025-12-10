@@ -39,6 +39,7 @@ class EpaperDisplay:
         self.epd = None
         self.settings_manager = settings_manager
         self.history = []
+        self.unplugged_channels: List[int] = []  # Channels with 0.00 mV (unplugged)
         # Standard fonts for headers and labels
         self.font_large = None
         self.font_medium = None
@@ -301,6 +302,10 @@ class EpaperDisplay:
         
         return plot_img, x, y
 
+    def set_unplugged_channels(self, unplugged: List[int]) -> None:
+        """Set the list of unplugged channels to display."""
+        self.unplugged_channels = unplugged
+
     def display_readings(self, readings: List[float]):
         """Update only temperature readings with partial refresh (fast update).
         Returns the PIL Image that was displayed."""
@@ -373,9 +378,13 @@ class EpaperDisplay:
                 label = f"CH {idx + 1}:"
                 draw.text((x_pos, y_pos_current), label, font=font_medium, fill=0)
                 
-                # Add line style indicator below channel label
-                style_indicator = linestyle_symbols.get(display_idx % 5, '━')
-                draw.text((x_pos, y_pos_current + 25), style_indicator, font=self.font_small, fill=0)
+                # Add unplugged indicator if channel is not connected
+                if (idx + 1) in self.unplugged_channels:
+                    draw.text((x_pos + 140, y_pos_current), "[UNPLUGGED]", font=self.font_small, fill=0)
+                else:
+                    # Add line style indicator below channel label
+                    style_indicator = linestyle_symbols.get(display_idx % 5, '━')
+                    draw.text((x_pos, y_pos_current + 25), style_indicator, font=self.font_small, fill=0)
 
                 try:
                     temp_val = float(reading)

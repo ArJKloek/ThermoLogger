@@ -48,6 +48,10 @@ class DummySMtc:
     def get_mv(self, channel: int) -> float:
         """Return a dummy voltage value (not used in dummy mode)."""
         return 0.0
+    
+    def check_unplugged_channels(self) -> List[int]:
+        """Check for unplugged channels (returns empty list for dummy mode)."""
+        return []
 
 
 class ThermoThread(QThread):
@@ -66,6 +70,7 @@ class ThermoThread(QThread):
         self._startup_error = ""
         self.device = None
         self.source = "unknown"
+        self.unplugged_channels = []  # List of channels with 0.00 mV (unplugged)
         self._init_device()
 
     def _init_device(self) -> None:
@@ -100,6 +105,22 @@ class ThermoThread(QThread):
                         except Exception as e:
                             print(f"[HARDWARE] Failed to set CH{channel + 1} type: {e}")
             
+            # Check for unplugged channels (0.00 mV voltage)
+            print("[HARDWARE] Checking for unplugged channels...")
+            self.unplugged_channels = []
+            for ch in range(1, self.channels + 1):
+                try:
+                    mv = self.device.get_mv(ch)
+                    if mv == 0.0:
+                        self.unplugged_channels.append(ch)
+                        print(f"[HARDWARE] CH{ch} unplugged (0.00 mV)")
+                except Exception as e:
+                    print(f"[HARDWARE] Error checking CH{ch}: {e}")
+            
+            if self.unplugged_channels:
+                unplugged_str = ", ".join([f"CH{ch}" for ch in self.unplugged_channels])
+                print(f"[HARDWARE] Unplugged channels: {unplugged_str}")
+            
         except Exception as exc:  # pragma: no cover - depends on hardware
             self.device = DummySMtc(self.channels)
             self.source = "dummy"
@@ -122,14 +143,6 @@ class ThermoThread(QThread):
                 try:
                     temp = self.device.get_temp(idx + 1)
                     readings.append(temp)
-                    
-                    # Read and print voltage for hardware mode
-                    if self.source == "hardware":
-                        try:
-                            mv = self.device.get_mv(idx + 1)
-                            print(f"[VOLTAGE] CH{idx + 1}: {mv:.2f} mV (Temp: {temp:.1f}°C)")
-                        except Exception as mv_exc:
-                            print(f"[VOLTAGE ERROR] CH{idx + 1}: {mv_exc}")
                 except Exception as exc:
                     self.error.emit(str(exc))
                     readings.append(float("nan"))
