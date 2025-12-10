@@ -333,13 +333,13 @@ class EpaperDisplay:
             
             if icon_path:
                 img = Image.open(str(icon_path))
-                # Convert to RGBA first if needed, then to 1-bit B&W
+                # Keep RGBA to preserve transparency
                 if img.mode != "RGBA":
                     img = img.convert("RGBA")
                 # Resize to 30x30 pixels
                 img = img.resize((30, 30), Image.Resampling.LANCZOS)
-                # Convert to 1-bit for e-paper
-                self.unplugged_icon = img.convert("1")
+                # Store as RGBA (we'll composite it properly when pasting)
+                self.unplugged_icon = img
                 logging.info(f"Loaded unplugged icon from: {icon_path}")
                 print(f"[EPAPER] Loaded unplugged icon: {icon_path}")
             else:
@@ -424,12 +424,12 @@ class EpaperDisplay:
                 # Add unplugged icon or line style indicator below channel label
                 if (idx + 1) in self.unplugged_channels:
                     if self.unplugged_icon:
-                        # Paste the unplugged icon (handle both 1-bit and RGBA formats)
+                        # Composite RGBA icon onto 1-bit background using alpha channel
                         try:
-                            if self.unplugged_icon.mode == "1":
-                                image.paste(self.unplugged_icon, (x_pos, y_pos_current + 20))
-                            else:
-                                image.paste(self.unplugged_icon, (x_pos, y_pos_current + 20), self.unplugged_icon)
+                            # Convert RGBA icon to 1-bit while preserving alpha as mask
+                            icon_1bit = self.unplugged_icon.convert("1")
+                            # Use the alpha channel as the mask for proper transparency handling
+                            image.paste(icon_1bit, (x_pos, y_pos_current + 20), self.unplugged_icon)
                         except Exception as e:
                             print(f"[EPAPER] Error pasting icon: {e}")
                 else:
