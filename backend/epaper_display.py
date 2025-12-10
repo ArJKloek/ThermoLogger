@@ -261,16 +261,18 @@ class EpaperDisplay:
         if not series_times:
             return None
 
-        # Dynamic temp scale
+        # Dynamic temp scale: +5°C above max, -5°C below min, rounded to integers
         flat_vals = [v for series in series_values for v in series if isinstance(v, (int, float)) and not math.isnan(v)]
         if not flat_vals:
             return None
         
         data_min = min(flat_vals)
         data_max = max(flat_vals)
-        padding = (data_max - data_min) * 0.1 if data_max > data_min else 5
-        vmin = max(0, data_min - padding)
-        vmax = min(150, data_max + padding)
+        vmin = int(data_min - 5)
+        vmax = int(data_max + 5)
+        # Clamp to reasonable temperature range
+        vmin = max(0, vmin)
+        vmax = min(150, vmax)
 
         # Create matplotlib figure with fixed subplot positioning
         dpi = 100
