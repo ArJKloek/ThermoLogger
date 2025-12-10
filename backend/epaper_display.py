@@ -420,16 +420,22 @@ class EpaperDisplay:
 
                 label = f"CH {idx + 1}:"
                 draw.text((x_pos, y_pos_current), label, font=font_medium, fill=0)
-                
+
+                # Compute label width to place the unplugged icon just to the right
+                label_bbox = draw.textbbox((x_pos, y_pos_current), label, font=font_medium)
+                label_width = label_bbox[2] - label_bbox[0]
+
                 # Add unplugged icon or line style indicator below channel label
                 if (idx + 1) in self.unplugged_channels:
                     if self.unplugged_icon:
-                        # Composite RGBA icon onto 1-bit background using alpha channel
                         try:
-                            # Convert RGBA icon to 1-bit while preserving alpha as mask
                             icon_1bit = self.unplugged_icon.convert("1")
-                            # Use the alpha channel as the mask for proper transparency handling
-                            image.paste(icon_1bit, (x_pos, y_pos_current + 20), self.unplugged_icon)
+                            icon_w, icon_h = icon_1bit.size
+                            icon_x = x_pos + label_width + 6  # small gap after text
+                            # Vertically center icon relative to label text
+                            label_height = label_bbox[3] - label_bbox[1]
+                            icon_y = y_pos_current + max(0, (label_height - icon_h) // 2)
+                            image.paste(icon_1bit, (icon_x, icon_y), self.unplugged_icon)
                         except Exception as e:
                             print(f"[EPAPER] Error pasting icon: {e}")
                 else:
