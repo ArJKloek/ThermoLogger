@@ -60,6 +60,7 @@ class ThermoThread(QThread):
     reading_ready = pyqtSignal(list)
     source_changed = pyqtSignal(str)
     error = pyqtSignal(str)
+    unplugged_changed = pyqtSignal(list)  # Emits updated unplugged channels list
 
     def __init__(self, interval_sec: float = 1.0, channels: int = 8, settings_manager=None, parent=None):
         super().__init__(parent)
@@ -71,6 +72,8 @@ class ThermoThread(QThread):
         self.device = None
         self.source = "unknown"
         self.unplugged_channels = []  # List of channels with 0.00 mV (unplugged)
+        self._check_counter = 0  # Counter for periodic unplugged checks
+        self._check_interval = 10  # Check every 10 readings (~10 seconds)
         self._init_device()
 
     def _init_device(self) -> None:
@@ -126,6 +129,42 @@ class ThermoThread(QThread):
             self.source = "dummy"
             self._startup_error = str(exc)
 
+    def _check_unplugged_status(self) -> None:
+        """Check voltage on all channels and update unplugged list if changed."""
+        if self.source != "hardware":
+            return
+        
+        try:
+            current_unplugged = []
+            for ch in range(1, self.channels + 1):
+                try:
+                    mv = self.device.get_mv(ch)
+                    if mv == 0.0:
+                        current_unplugged.append(ch)
+                except Exception:
+                    pass
+            
+            # Check if the unplugged list changed
+            if set(current_unplugged) != set(self.unplugged_channels):
+                # Find newly connected channels
+                newly_connected = set(self.unplugged_channels) - set(current_unplugged)
+                # Find newly disconnected channels
+                newly_disconnected = set(current_unplugged) - set(self.unplugged_channels)
+                
+                if newly_connected:
+                    connected_str = ", ".join([f"CH{ch}" for ch in sorted(newly_connected)])
+                    print(f"[HARDWARE] Channel(s) connected: {connected_str}")
+                
+                if newly_disconnected:
+                    disconnected_str = ", ".join([f"CH{ch}" for ch in sorted(newly_disconnected)])
+                    print(f"[HARDWARE] Channel(s) disconnected: {disconnected_str}")
+                
+                # Update the list and emit signal
+                self.unplugged_channels = current_unplugged
+                self.unplugged_changed.emit(self.unplugged_channels)
+        except Exception as e:
+            print(f"[HARDWARE] Error checking unplugged status: {e}")
+
     def run(self) -> None:  # pragma: no cover - involves timing and threads
         if self._startup_error:
             self.error.emit(f"Falling back to dummy: {self._startup_error}")
@@ -147,6 +186,13 @@ class ThermoThread(QThread):
                     self.error.emit(str(exc))
                     readings.append(float("nan"))
             self.reading_ready.emit(readings)
+            
+            # Periodically check for unplugged channel changes
+            self._check_counter += 1
+            if self._check_counter >= self._check_interval:
+                self._check_counter = 0
+                self._check_unplugged_status()
+            
             self.msleep(int(self.interval_sec * 1000))
 
     def stop(self, timeout_ms: int = 1000) -> None:
