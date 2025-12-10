@@ -294,6 +294,12 @@ class EpaperDisplay:
         
         # Configure axes
         ax.set_ylim(vmin, vmax)
+        
+        # Fix x-axis to exactly 1 hour: (now - 1 hour) to now
+        now = datetime.now()
+        one_hour_ago = now - timedelta(hours=1)
+        ax.set_xlim(one_hour_ago, now)
+        
         ax.set_ylabel('Temperature (°C)', fontsize=8)
         ax.set_xlabel('Time', fontsize=8)
         ax.tick_params(axis='both', labelsize=7)
