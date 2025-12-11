@@ -2,7 +2,7 @@
 """
 Test script for reading on-board thermistor/RTD temperatures from SMTC card.
 
-Tests all 10 thermistor channels with formatted table output.
+Tests all 8 thermistor channels with formatted table output.
 Run on Raspberry Pi with: python3 test_thermistors.py
 """
 
@@ -29,8 +29,8 @@ def main():
         print()
         
         # Display header
-        print(f"{'Time':<10} | {'CH1':>6} | {'CH2':>6} | {'CH3':>6} | {'CH4':>6} | {'CH5':>6} | {'CH6':>6} | {'CH7':>6} | {'CH8':>6} | {'CH9':>6} | {'CH10':>6}")
-        print("-" * 110)
+        print(f"{'Time':<10} | {'CH1':>6} | {'CH2':>6} | {'CH3':>6} | {'CH4':>6} | {'CH5':>6} | {'CH6':>6} | {'CH7':>6} | {'CH8':>6}")
+        print("-" * 90)
         
         # Read thermistors continuously
         iteration = 0
@@ -39,8 +39,8 @@ def main():
                 timestamp = datetime.now().strftime("%H:%M:%S")
                 temps = []
                 
-                # Read all 10 thermistor channels
-                for channel in range(1, 11):
+                # Read all 8 thermistor channels
+                for channel in range(1, 9):
                     try:
                         temp = card.get_thermistor_temp(channel)
                         temps.append(f"{temp:6.1f}")

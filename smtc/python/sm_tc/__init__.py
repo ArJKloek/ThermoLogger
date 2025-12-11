@@ -5,7 +5,7 @@ __version__ = "1.0.1"
 _CARD_BASE_ADDRESS = 0x16
 _STACK_LEVEL_MAX = 7
 _IN_CH_COUNT = 8
-_THERMISTOR_CH_COUNT = 10  # On-board thermistor channels
+_THERMISTOR_CH_COUNT = 8  # On-board thermistor channels
 _TEMP_SIZE_BYTES = 2
 _TEMP_SCALE_FACTOR = 10.0
 
@@ -16,7 +16,7 @@ _REVISION_HW_MINOR_MEM_ADD = 51
 _DIAG_TEMPERATURE_MEM_ADD = 24  # On-board diagnostic temperature sensor
 _DIAG_5V_MEM_ADD = 26  # On-board 5V supply voltage
 _TCP_MV1_ADD = 54
-_I2C_THERMISTOR1_ADD = 113  # On-board thermistor temperature registers (base address)
+_I2C_THERMISTOR1_ADD = 101  # On-board thermistor temperature registers (verified via debug)
 _MV_SCALE_FACTOR = 100.0
 _DIAG_TEMP_SCALE_FACTOR = 10.0  # Same scale as thermocouple temperature
 _DIAG_5V_SCALE_FACTOR = 100.0  # 5V reading scale
@@ -127,21 +127,21 @@ class SMtc:
     def get_thermistor_temp(self, channel):
         """Read on-board thermistor temperature in °C and return as float.
         
-        Reads one of the 10 on-board RTD/thermistor temperature sensors.
-        Channels are numbered 1-10.
+        Reads one of the 8 on-board RTD/thermistor temperature sensors.
+        Channels are numbered 1-8.
         
         Args:
-            channel (int): Thermistor channel number [1..10]
+            channel (int): Thermistor channel number [1..8]
             
         Returns:
             float: Temperature in degrees Celsius
             
         Raises:
-            ValueError: If channel is not in valid range [1..10]
+            ValueError: If channel is not in valid range [1..8]
             Exception: If I2C read fails
         """
         if channel < 1 or channel > _THERMISTOR_CH_COUNT:
-            raise ValueError('Invalid thermistor channel number, must be [1..10]!')
+            raise ValueError('Invalid thermistor channel number, must be [1..8]!')
         bus = smbus2.SMBus(self._i2c_bus_no)
         try:
             buff = bus.read_i2c_block_data(self._hw_address_, _I2C_THERMISTOR1_ADD + (channel - 1) * _TEMP_SIZE_BYTES, 2)
