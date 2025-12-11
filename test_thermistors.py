@@ -11,12 +11,11 @@ import time
 from datetime import datetime
 
 try:
-    sys.path.insert(0, 'smtc/python')
-    from sm_tc import SMtc
+    import sm_tc
 except ImportError as e:
     print(f"ERROR: Could not import SMtc library: {e}")
     print("Make sure to install the sm_tc library:")
-    print("  cd smtc/python && pip3 install --upgrade .")
+    print("  cd smtc/python && sudo pip3 install --upgrade .")
     sys.exit(1)
 
 
@@ -24,7 +23,8 @@ def main():
     """Test thermistor temperature reading."""
     try:
         # Initialize SMTC card
-        card = SMtc(0x16, 1)  # Default address 0x16, I2C bus 1
+        # Stack level 0 = address 0x16, I2C bus 1
+        card = sm_tc.SMtc(stack=0, i2c=1)
         print("✓ SMTC card initialized successfully")
         print()
         
@@ -72,10 +72,12 @@ def main():
     
     except Exception as e:
         print(f"FATAL ERROR: {e}")
-        print("Troubleshooting:")
-        print("  - Ensure running as root (sudo python3 test_thermistors.py)")
+        print("\nTroubleshooting:")
+        print("  - Ensure running as root: sudo python3 test_thermistors.py")
         print("  - Verify I2C is enabled: raspi-config > Interface Options > I2C")
         print("  - Check SMTC library is installed: pip3 list | grep sm-tc")
+        print("  - Verify stack level: SMTC(stack=0) for I2C address 0x16")
+        print("    If card is at different address (0x17-0x1E), use stack 1-6")
         sys.exit(1)
 
 
