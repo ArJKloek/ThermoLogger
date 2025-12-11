@@ -90,16 +90,17 @@ def main():
             sys.exit(1)
 
     print(f"Reading channel {ch} (press Ctrl+C to stop)...")
-    print(f"{'Time':<10} | {'mV':>8} | {'Calc °C':>8} | {'Board °C':>9}")
-    print('-' * 45)
+    print(f"{'Time':<10} | {'mV':>8} | {'Calc °C':>8} | {'Board °C':>9} | {'Therm °C':>9}")
+    print('-' * 58)
 
     try:
         while True:
             mv = card.get_mv(ch)
             calc_c = k_type_mv_to_c(mv)
             board_c = card.get_temp(ch)
+            therm_c = card.get_thermistor_temp(ch)
             now = datetime.now().strftime('%H:%M:%S')
-            print(f"{now:<10} | {mv:8.3f} | {calc_c:8.2f} | {board_c:9.2f}")
+            print(f"{now:<10} | {mv:8.3f} | {calc_c:8.2f} | {board_c:9.2f} | {therm_c:9.2f}")
     except KeyboardInterrupt:
         print("\nDone")
 
