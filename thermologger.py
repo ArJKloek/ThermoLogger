@@ -4,7 +4,7 @@ from pathlib import Path
 from collections import deque
 from datetime import datetime, timedelta
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QGridLayout, QLabel, QHBoxLayout
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QGridLayout, QLabel, QHBoxLayout, QPushButton
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFontDatabase, QPixmap, QImage, QPainter, QFont
 from PyQt5 import uic
@@ -264,6 +264,24 @@ class MainWindow(QMainWindow):
         self.sensors_layout = QGridLayout(self.sensors_container)
         main_layout.addWidget(self.sensors_container)
 
+        # Virtual buttons to mimic forthcoming physical buttons on the Pi
+        self.buttons_container = QWidget()
+        self.buttons_layout = QHBoxLayout(self.buttons_container)
+        self.buttons_layout.setContentsMargins(0, 8, 0, 0)
+        self.buttons_layout.setSpacing(12)
+
+        self.soft_buttons = []
+        for idx in range(1, 5):
+            button = QPushButton(f"Button {idx}")
+            button.setObjectName(f"softButton{idx}")
+            button.setMinimumHeight(40)
+            button.clicked.connect(lambda _, i=idx: self.on_soft_button_pressed(i))
+            self.soft_buttons.append(button)
+            self.buttons_layout.addWidget(button)
+
+        self.buttons_layout.addStretch()
+        main_layout.addWidget(self.buttons_container)
+
     def setup_sensors(self):
         """Add multiple sensor widgets to the sensors grid - only enabled channels."""
         display_idx = 0
@@ -282,6 +300,24 @@ class MainWindow(QMainWindow):
 
         stretch_row = (display_idx + 1) // 2 + 1
         self.sensors_layout.setRowStretch(stretch_row, 1)
+
+    def on_soft_button_pressed(self, button_index: int):
+        """Handle clicks from the virtual hardware buttons."""
+        print(f"[BUTTON] Virtual button {button_index} pressed")
+        if hasattr(self, 'statusbar'):
+            self.statusbar.showMessage(f"Virtual button {button_index} pressed", 1500)
+        self.handle_virtual_button(button_index)
+
+    def handle_virtual_button(self, button_index: int):
+        """Map virtual button presses to actions; adjust as needed for hardware."""
+        if button_index == 1 and not self.logger.is_logging:
+            self.start_logging()
+        elif button_index == 2 and self.logger.is_logging:
+            self.stop_logging()
+        elif button_index == 3:
+            self.reset_logging()
+        elif button_index == 4:
+            self.show_plot_window()
 
     def start_worker(self):
         """Start the background reader thread."""
