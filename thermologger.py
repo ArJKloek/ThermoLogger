@@ -442,6 +442,8 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'statusbar'):
             self.statusbar.showMessage("Logging paused", 3000)
         print("[LOGGING] Paused")
+        # Refresh e-paper immediately to show paused state and last log time
+        self.update_epaper_display()
 
     def stop_logging(self):
         """Stop logging temperature data."""
@@ -469,6 +471,15 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'statusbar'):
             self.statusbar.showMessage("Logging reset - new file will be created on start", 3000)
         print("[LOGGING] Reset - new file will be created on next start")
+
+        # Show "reset" briefly, then revert to default OFF status
+        QTimer.singleShot(2000, self.clear_epaper_status)
+        self.update_epaper_display()
+
+    def clear_epaper_status(self):
+        """Clear any temporary e-paper status message (e.g., after reset)."""
+        self.epaper.set_logging_status(self.logger.is_logging, message=None)
+        self.update_epaper_display()
 
     def recheck_thermocouples(self):
         """Manually trigger a thermocouple connection check."""

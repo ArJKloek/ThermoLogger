@@ -404,7 +404,10 @@ class EpaperDisplay:
             # Draw logging status or custom message (paused/reset/etc.)
             status_text = self.status_message or ("Logging: ON" if self.logging_active else "Logging: OFF")
             draw.text((250, 65), status_text, font=self.font_small, fill=0)
-            if self.logging_active and self.last_log_time:
+
+            # Show last log time when active, or when paused message is shown (helps indicate file not reset)
+            show_last_log = self.logging_active or (self.status_message and "paused" in self.status_message.lower())
+            if show_last_log and self.last_log_time:
                 log_time_text = f"Last log: {self.last_log_time.strftime('%H:%M:%S')}"
                 draw.text((450, 65), log_time_text, font=self.font_small, fill=0)
 
