@@ -204,7 +204,8 @@ class MainWindow(QMainWindow):
         self.history = deque(maxlen=3600)  # store last hour at 1 Hz
         self.epaper_update_timer = QTimer()
         self.epaper_update_timer.timeout.connect(self.update_epaper_display)
-        self.epaper_update_timer.start(5000)  # Update e-paper every 5 seconds
+        self.epaper_base_interval = 5000  # ms
+        self.epaper_update_timer.start(self.epaper_base_interval)  # Update e-paper every 5 seconds
         self.logging_timer = QTimer()
         self.logging_timer.timeout.connect(self.on_logging_timer)
         self.logging_interval = 5  # Default 5 seconds
@@ -350,6 +351,7 @@ class MainWindow(QMainWindow):
         self.epaper.set_unplugged_channels(unplugged_channels)
         self.epaper.stop_flash_channels()
         self.epaper.set_logging_status(self.logger.is_logging, message=None)
+        self.restore_epaper_update_interval()
         print(f"[DISPLAY] Updated unplugged channels: {unplugged_channels}")
 
     def update_readings(self, readings):
@@ -384,6 +386,10 @@ class MainWindow(QMainWindow):
             image = self.epaper.display_readings(self.last_readings)
             if image and self.preview_window:
                 self.preview_window.update_preview(image)
+
+            # If flashing finished, restore normal epaper cadence
+            if self.epaper.flash_ticks == 0 and self.epaper_update_timer.interval() != self.epaper_base_interval:
+                self.restore_epaper_update_interval()
 
     def show_plot_window(self):
         """Open the plot window."""
@@ -483,6 +489,16 @@ class MainWindow(QMainWindow):
         self.epaper.set_logging_status(self.logger.is_logging, message=None)
         self.update_epaper_display()
 
+    def start_fast_epaper_updates(self, interval_ms: int = 400):
+        """Temporarily speed up e-paper updates for flashing animations."""
+        self.epaper_update_timer.stop()
+        self.epaper_update_timer.start(interval_ms)
+
+    def restore_epaper_update_interval(self):
+        """Restore the default e-paper update interval."""
+        self.epaper_update_timer.stop()
+        self.epaper_update_timer.start(self.epaper_base_interval)
+
     def recheck_thermocouples(self):
         """Manually trigger a thermocouple connection check."""
         if self.worker and hasattr(self.worker, '_check_unplugged_status'):
@@ -492,6 +508,7 @@ class MainWindow(QMainWindow):
             # Flash channels on e-paper and hide unplugged icons while checking
             self.epaper.start_flash_channels(cycles=6)
             self.epaper.set_logging_status(self.logger.is_logging, message="Rechecking TC...")
+            self.start_fast_epaper_updates()
             self.update_epaper_display()
             # Trigger the check in the worker thread
             self.worker._check_unplugged_status()
