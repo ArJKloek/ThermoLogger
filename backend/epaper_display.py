@@ -65,6 +65,8 @@ class EpaperDisplay:
         self.data_start_y = 110  # Y position where temperature data starts
         self.data_height = 360  # Height of data region (4 rows * 70 pixels + margin)
         self.status_message: Optional[str] = None  # Custom status line for events (paused/reset)
+        self.flash_ticks: int = 0  # Remaining flash cycles for channel highlight
+        self.flash_phase: bool = False  # Toggle state for flashing effect
 
         print(f"[EPAPER] EpaperDisplay __init__, HAS_EPAPER={HAS_EPAPER}")
         
@@ -198,6 +200,16 @@ class EpaperDisplay:
     def set_history(self, history):
         """Set history deque for plotting (expects list of (datetime, readings))."""
         self.history = list(history) if history else []
+
+    def start_flash_channels(self, cycles: int = 6):
+        """Start a short flashing effect on channel labels during checks."""
+        self.flash_ticks = max(0, cycles)
+        self.flash_phase = False
+
+    def stop_flash_channels(self):
+        """Stop flashing and clear state."""
+        self.flash_ticks = 0
+        self.flash_phase = False
 
     def _make_font(self, path: Optional[str], size: int, fallback) -> ImageFont.FreeTypeFont:
         """Create a font from path if available, otherwise fallback."""
@@ -441,27 +453,34 @@ class EpaperDisplay:
                 y_pos_current = self.data_start_y + display_idx * row_spacing
 
                 label = f"CH {idx + 1}:"
-                draw.text((x_pos, y_pos_current), label, font=font_medium, fill=0)
+                # Flash effect: invert label on alternating phases
+                if self.flash_ticks > 0 and self.flash_phase:
+                    label_bbox = draw.textbbox((x_pos, y_pos_current), label, font=font_medium)
+                    draw.rectangle(label_bbox, fill=0)
+                    draw.text((x_pos, y_pos_current), label, font=font_medium, fill=255)
+                else:
+                    draw.text((x_pos, y_pos_current), label, font=font_medium, fill=0)
 
                 # Compute label width to place the unplugged icon just to the right
                 label_bbox = draw.textbbox((x_pos, y_pos_current), label, font=font_medium)
                 label_width = label_bbox[2] - label_bbox[0]
 
                 # Add unplugged icon or line style indicator below channel label
-                if (idx + 1) in self.unplugged_channels:
-                    if self.unplugged_icon:
-                        try:
-                            icon_w, icon_h = self.unplugged_icon.size
-                            icon_x = x_pos + label_width + 6  # small gap after text
-                            # Vertically center icon relative to label text
-                            label_height = label_bbox[3] - label_bbox[1]
-                            icon_y = y_pos_current + max(0, (label_height - icon_h) // 2)
-                            image.paste(self.unplugged_icon, (icon_x, icon_y))
-                        except Exception as e:
-                            print(f"[EPAPER] Error pasting icon: {e}")
-                else:
-                    style_indicator = linestyle_symbols.get(display_idx % 5, '━')
-                    draw.text((x_pos, y_pos_current + 25), style_indicator, font=self.font_small, fill=0)
+                if self.flash_ticks == 0:
+                    if (idx + 1) in self.unplugged_channels:
+                        if self.unplugged_icon:
+                            try:
+                                icon_w, icon_h = self.unplugged_icon.size
+                                icon_x = x_pos + label_width + 6  # small gap after text
+                                # Vertically center icon relative to label text
+                                label_height = label_bbox[3] - label_bbox[1]
+                                icon_y = y_pos_current + max(0, (label_height - icon_h) // 2)
+                                image.paste(self.unplugged_icon, (icon_x, icon_y))
+                            except Exception as e:
+                                print(f"[EPAPER] Error pasting icon: {e}")
+                    else:
+                        style_indicator = linestyle_symbols.get(display_idx % 5, '━')
+                        draw.text((x_pos, y_pos_current + 25), style_indicator, font=self.font_small, fill=0)
 
                 try:
                     temp_val = float(reading)
@@ -496,6 +515,11 @@ class EpaperDisplay:
                 self.width,
                 self.height
             )
+
+            # Step flashing state
+            if self.flash_ticks > 0:
+                self.flash_phase = not self.flash_phase
+                self.flash_ticks -= 1
             
             return image  # Return the image for preview
 

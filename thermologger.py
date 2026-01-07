@@ -348,6 +348,8 @@ class MainWindow(QMainWindow):
     def on_unplugged_changed(self, unplugged_channels):
         """Handle changes in unplugged channel status."""
         self.epaper.set_unplugged_channels(unplugged_channels)
+        self.epaper.stop_flash_channels()
+        self.epaper.set_logging_status(self.logger.is_logging, message=None)
         print(f"[DISPLAY] Updated unplugged channels: {unplugged_channels}")
 
     def update_readings(self, readings):
@@ -487,6 +489,10 @@ class MainWindow(QMainWindow):
             print("[BUTTON] Rechecking thermocouple connections...")
             if hasattr(self, 'statusbar'):
                 self.statusbar.showMessage("Rechecking thermocouples...", 2000)
+            # Flash channels on e-paper and hide unplugged icons while checking
+            self.epaper.start_flash_channels(cycles=6)
+            self.epaper.set_logging_status(self.logger.is_logging, message="Rechecking TC...")
+            self.update_epaper_display()
             # Trigger the check in the worker thread
             self.worker._check_unplugged_status()
         else:
