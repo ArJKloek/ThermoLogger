@@ -424,7 +424,7 @@ class MainWindow(QMainWindow):
         """Start logging temperature data."""
         self.logger.start_logging()
         self.logging_timer.start(self.logging_interval * 1000)
-        self.epaper.set_logging_status(True)
+        self.epaper.set_logging_status(True, message=None)
         if hasattr(self, 'actionStart'):
             self.actionStart.setEnabled(False)
         if hasattr(self, 'actionStop'):
@@ -438,7 +438,7 @@ class MainWindow(QMainWindow):
         """Pause logging without closing the file."""
         self.logging_timer.stop()
         self.logger.stop_logging()
-        self.epaper.set_logging_status(False)
+        self.epaper.set_logging_status(False, message="Logging paused")
         if hasattr(self, 'statusbar'):
             self.statusbar.showMessage("Logging paused", 3000)
         print("[LOGGING] Paused")
@@ -447,7 +447,7 @@ class MainWindow(QMainWindow):
         """Stop logging temperature data."""
         self.logging_timer.stop()
         self.logger.stop_logging()
-        self.epaper.set_logging_status(False)
+        self.epaper.set_logging_status(False, message="Logging stopped")
         if hasattr(self, 'actionStart'):
             self.actionStart.setEnabled(True)
         if hasattr(self, 'actionStop'):
@@ -459,7 +459,7 @@ class MainWindow(QMainWindow):
         """Reset logging (stop and prepare for new log file)."""
         self.logging_timer.stop()
         self.logger.stop_logging()
-        self.epaper.set_logging_status(False)
+        self.epaper.set_logging_status(False, message="Logging reset")
         if hasattr(self, 'actionStart'):
             self.actionStart.setEnabled(True)
         if hasattr(self, 'actionStop'):
@@ -504,7 +504,7 @@ class MainWindow(QMainWindow):
         if self.last_readings:
             from datetime import datetime
             self.logger.log_reading(self.last_readings)
-            self.epaper.set_logging_status(True, datetime.now())
+            self.epaper.set_logging_status(True, datetime.now(), message=None)
 
     def closeEvent(self, event):
         self.logging_timer.stop()

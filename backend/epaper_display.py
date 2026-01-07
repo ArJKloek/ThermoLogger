@@ -64,6 +64,7 @@ class EpaperDisplay:
         self.partial_mode_active = False  # Track if we're in partial update mode
         self.data_start_y = 110  # Y position where temperature data starts
         self.data_height = 360  # Height of data region (4 rows * 70 pixels + margin)
+        self.status_message: Optional[str] = None  # Custom status line for events (paused/reset)
 
         print(f"[EPAPER] EpaperDisplay __init__, HAS_EPAPER={HAS_EPAPER}")
         
@@ -186,11 +187,13 @@ class EpaperDisplay:
             logging.error(f"Error initializing e-paper display: {e}")
             print(f"[EPAPER ERROR] {e}")
 
-    def set_logging_status(self, is_logging: bool, last_log_time=None):
+    def set_logging_status(self, is_logging: bool, last_log_time=None, message: Optional[str] = None):
         """Set the logging status to display on screen."""
         self.logging_active = is_logging
         if last_log_time:
             self.last_log_time = last_log_time
+        # Store a short custom message (e.g., "Logging paused" / "Logging reset")
+        self.status_message = message
 
     def set_history(self, history):
         """Set history deque for plotting (expects list of (datetime, readings))."""
@@ -398,16 +401,12 @@ class EpaperDisplay:
             timestamp = self.last_update_time.strftime("%H:%M:%S")
             draw.text((10, 65), f"Updated: {timestamp}", font=self.font_small, fill=0)
 
-            # Draw logging status
-            if self.logging_active:
-                status_text = "Logging: ON"
-                draw.text((250, 65), status_text, font=self.font_small, fill=0)
-                if self.last_log_time:
-                    log_time_text = f"Last log: {self.last_log_time.strftime('%H:%M:%S')}"
-                    draw.text((450, 65), log_time_text, font=self.font_small, fill=0)
-            else:
-                status_text = "Logging: OFF"
-                draw.text((250, 65), status_text, font=self.font_small, fill=0)
+            # Draw logging status or custom message (paused/reset/etc.)
+            status_text = self.status_message or ("Logging: ON" if self.logging_active else "Logging: OFF")
+            draw.text((250, 65), status_text, font=self.font_small, fill=0)
+            if self.logging_active and self.last_log_time:
+                log_time_text = f"Last log: {self.last_log_time.strftime('%H:%M:%S')}"
+                draw.text((450, 65), log_time_text, font=self.font_small, fill=0)
 
             # Determine enabled channels
             if self.settings_manager:
