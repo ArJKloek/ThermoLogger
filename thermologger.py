@@ -271,8 +271,9 @@ class MainWindow(QMainWindow):
         self.buttons_layout.setSpacing(12)
 
         self.soft_buttons = []
+        button_labels = ["Start/Pause", "Reset", "Check TC", "(Reserved)"]
         for idx in range(1, 5):
-            button = QPushButton(f"Button {idx}")
+            button = QPushButton(button_labels[idx - 1])
             button.setObjectName(f"softButton{idx}")
             button.setMinimumHeight(40)
             button.clicked.connect(lambda _, i=idx: self.on_soft_button_pressed(i))
@@ -310,14 +311,26 @@ class MainWindow(QMainWindow):
 
     def handle_virtual_button(self, button_index: int):
         """Map virtual button presses to actions; adjust as needed for hardware."""
-        if button_index == 1 and not self.logger.is_logging:
-            self.start_logging()
-        elif button_index == 2 and self.logger.is_logging:
-            self.stop_logging()
+        if button_index == 1:
+            # Toggle start/pause logging
+            if self.logger.is_logging:
+                self.pause_logging()
+            else:
+                self.start_logging()
+        elif button_index == 2:
+            # Reset logging (create new log file) - only when paused/stopped
+            if not self.logger.is_logging:
+                self.reset_logging()
+            else:
+                if hasattr(self, 'statusbar'):
+                    self.statusbar.showMessage("Stop logging first before resetting", 2000)
         elif button_index == 3:
-            self.reset_logging()
+            # Re-check for attached thermocouples
+            self.recheck_thermocouples()
         elif button_index == 4:
-            self.show_plot_window()
+            # Reserved for future use
+            if hasattr(self, 'statusbar'):
+                self.statusbar.showMessage("Button 4: Reserved", 1500)
 
     def start_worker(self):
         """Start the background reader thread."""
@@ -421,6 +434,15 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'statusbar'):
             self.statusbar.showMessage("Logging started", 3000)
 
+    def pause_logging(self):
+        """Pause logging without closing the file."""
+        self.logging_timer.stop()
+        self.logger.stop_logging()
+        self.epaper.set_logging_status(False)
+        if hasattr(self, 'statusbar'):
+            self.statusbar.showMessage("Logging paused", 3000)
+        print("[LOGGING] Paused")
+
     def stop_logging(self):
         """Stop logging temperature data."""
         self.logging_timer.stop()
@@ -434,7 +456,7 @@ class MainWindow(QMainWindow):
             self.statusbar.showMessage("Logging stopped", 3000)
 
     def reset_logging(self):
-        """Reset logging (stop and clear current log)."""
+        """Reset logging (stop and prepare for new log file)."""
         self.logging_timer.stop()
         self.logger.stop_logging()
         self.epaper.set_logging_status(False)
@@ -445,7 +467,20 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'actionReset'):
             self.actionReset.setEnabled(False)
         if hasattr(self, 'statusbar'):
-            self.statusbar.showMessage("Logging reset", 3000)
+            self.statusbar.showMessage("Logging reset - new file will be created on start", 3000)
+        print("[LOGGING] Reset - new file will be created on next start")
+
+    def recheck_thermocouples(self):
+        """Manually trigger a thermocouple connection check."""
+        if self.worker and hasattr(self.worker, '_check_unplugged_status'):
+            print("[BUTTON] Rechecking thermocouple connections...")
+            if hasattr(self, 'statusbar'):
+                self.statusbar.showMessage("Rechecking thermocouples...", 2000)
+            # Trigger the check in the worker thread
+            self.worker._check_unplugged_status()
+        else:
+            if hasattr(self, 'statusbar'):
+                self.statusbar.showMessage("Thermocouple check not available", 2000)
 
     def set_logging_interval(self, seconds):
         """Set the logging interval."""
