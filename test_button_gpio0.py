@@ -31,6 +31,10 @@ def setup_gpio():
     
     print(f"[GPIO] Pin {BUTTON_PIN} configured as input with pull-up")
     print("[GPIO] Button should connect to ground when pressed")
+    
+    # Read initial state
+    initial_state = GPIO.input(BUTTON_PIN)
+    print(f"[GPIO] Initial pin state: {'HIGH (3.3V)' if initial_state else 'LOW (0V)'}")
 
 def button_callback(channel):
     """Callback function when button is pressed."""
@@ -45,6 +49,23 @@ def main():
     if HAS_GPIO:
         setup_gpio()
         
+        # First, continuously monitor the pin state for debugging
+        print("\n[DEBUG] Monitoring pin state for 5 seconds...")
+        print("[DEBUG] Press and hold button to see state change\n")
+        
+        start_time = time.time()
+        last_state = GPIO.input(BUTTON_PIN)
+        
+        while time.time() - start_time < 5:
+            current_state = GPIO.input(BUTTON_PIN)
+            if current_state != last_state:
+                print(f"[STATE CHANGE] Pin went {'HIGH (3.3V)' if current_state else 'LOW (0V)'}")
+                last_state = current_state
+            time.sleep(0.01)
+        
+        print("\n[DEBUG] State monitoring complete")
+        print(f"[DEBUG] Current pin state: {'HIGH' if GPIO.input(BUTTON_PIN) else 'LOW'}\n")
+        
         # Option 1: Use interrupt detection (recommended)
         print("\n[MODE] Using interrupt detection (falling edge)")
         print("[INFO] Press the button connected to GPIO 0...")
@@ -57,9 +78,14 @@ def main():
                             bouncetime=200)
         
         try:
-            # Keep program running
+            # Keep program running and show heartbeat
+            counter = 0
             while True:
-                time.sleep(0.1)
+                time.sleep(1)
+                counter += 1
+                if counter % 5 == 0:
+                    current = 'HIGH' if GPIO.input(BUTTON_PIN) else 'LOW'
+                    print(f"[HEARTBEAT] Still running... Pin state: {current}")
         except KeyboardInterrupt:
             print("\n[EXIT] Exiting...")
         finally:
