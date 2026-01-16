@@ -9,6 +9,7 @@ GPIO.setup(10, GPIO.IN, pull_up_down=GPIO.PUD_DOWN) # Set pin 10 to be an input 
 
 # Pass number 1 to the callback using lambda, with 200ms debounce time
 GPIO.add_event_detect(10, GPIO.RISING, callback=lambda channel: button_callback(channel, 1), bouncetime=200) # Setup event on pin 10 rising edge
+GPIO.add_event_detect(12, GPIO.RISING, callback=lambda channel: button_callback(channel, 2), bouncetime=200) # Setup event on pin 10 rising edge
 
 message = input("Press enter to quit\n\n") # Run until someone presses enter
 
