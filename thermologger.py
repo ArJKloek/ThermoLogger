@@ -77,9 +77,10 @@ class HardwareButtons:
             GPIO.add_event_detect(pin, GPIO.RISING,
                                   callback=lambda channel, b=button_num: self._on_press(b),
                                   bouncetime=self.bouncetime)
-        print(f"[GPIO] Buttons ready on pins {list(self.pin_map.values())}")
+        print(f"[GPIO] Buttons ready on pins {list(self.pin_map.values())}, debounce={self.bouncetime}ms")
 
     def _on_press(self, button_num: int):
+        print(f"[GPIO] Button {button_num} pressed (raw GPIO event)")
         try:
             self.callback(button_num)
         except Exception as exc:
@@ -368,31 +369,43 @@ class MainWindow(QMainWindow):
 
     def on_soft_button_pressed(self, button_index: int):
         """Handle clicks from the virtual hardware buttons."""
-        print(f"[BUTTON] Virtual button {button_index} pressed")
+        print(f"[BUTTON] Soft button {button_index} clicked (UI)")
         if hasattr(self, 'statusbar'):
             self.statusbar.showMessage(f"Virtual button {button_index} pressed", 1500)
         self.button_pressed.emit(button_index)
 
     def handle_virtual_button(self, button_index: int):
         """Map button presses (UI or GPIO) to actions."""
+        print(f"[BUTTON] Handle button {button_index} (checking current state...)")
+        print(f"[BUTTON]   - is_logging: {self.logger.is_logging}")
+        print(f"[BUTTON]   - logging_timer active: {self.logging_timer.isActive()}")
+        
         if button_index == 1:
             # Toggle start/pause logging
+            print(f"[BUTTON] Button 1: Start/Pause")
             if self.logger.is_logging:
+                print(f"[BUTTON]   -> Pausing logging")
                 self.pause_logging()
             else:
+                print(f"[BUTTON]   -> Starting logging")
                 self.start_logging()
         elif button_index == 2:
             # Reset logging (create new log file) - only when paused/stopped
+            print(f"[BUTTON] Button 2: Reset")
             if not self.logger.is_logging:
+                print(f"[BUTTON]   -> Resetting logging")
                 self.reset_logging()
             else:
+                print(f"[BUTTON]   -> Reset rejected (logging still active)")
                 if hasattr(self, 'statusbar'):
                     self.statusbar.showMessage("Stop logging first before resetting", 2000)
         elif button_index == 3:
             # Re-check for attached thermocouples
+            print(f"[BUTTON] Button 3: Check TC")
             self.recheck_thermocouples()
         elif button_index == 4:
             # Reserved for future use
+            print(f"[BUTTON] Button 4: Reserved")
             if hasattr(self, 'statusbar'):
                 self.statusbar.showMessage("Button 4: Reserved", 1500)
 
@@ -519,6 +532,7 @@ class MainWindow(QMainWindow):
 
     def on_gpio_button(self, button_index: int):
         """GPIO callback wrapper to emit through the Qt signal."""
+        print(f"[BUTTON] GPIO button {button_index} -> emitting signal")
         self.button_pressed.emit(button_index)
 
     def open_settings(self):
