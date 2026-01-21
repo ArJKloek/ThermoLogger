@@ -87,18 +87,18 @@ class HardwareButtons:
     def _setup(self):
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BOARD)
-          for button_num, pin in self.pin_map.items():
+        for button_num, pin in self.pin_map.items():
             # Buttons are active-LOW with pull-up
             GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
             # Read initial state
             initial_state = GPIO.input(pin)
             print(f"[GPIO] Button {button_num} on pin {pin}: initial state={initial_state} "
-                f"(0=pressed/LOW, 1=unpressed/HIGH)")
-        
-          print(f"[GPIO] Buttons ready on pins {list(self.pin_map.values())}, "
+                  f"(0=pressed/LOW, 1=unpressed/HIGH)")
+
+        print(f"[GPIO] Buttons ready on pins {list(self.pin_map.values())}, "
               f"hold_time={self.hold_time_ms}ms, confirmation={self.confirmation_count} polls, "
               f"startup_delay={self.startup_delay_ms}ms")
-          print("[GPIO] Using active-LOW button logic (pin goes LOW when pressed)")
+        print("[GPIO] Using active-LOW button logic (pin goes LOW when pressed)")
 
     def _start_polling(self):
         """Start polling pins using Qt timer after startup grace period."""
@@ -137,7 +137,7 @@ class HardwareButtons:
         # Clear any accumulated state during grace period
         for pin in self.pin_map.values():
             self.pin_hold_time[pin] = 0
-            self.pin_consecutive_high[pin] = 0
+            self.pin_consecutive_low[pin] = 0
             self.pin_pressed_triggered[pin] = False
         print("[GPIO] Startup grace period ended - buttons now active")
 
