@@ -89,14 +89,17 @@ class HardwareButtons:
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BOARD)
         for button_num, pin in self.pin_map.items():
+            # Buttons are active-HIGH with pull-down (like test_button.py)
             GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
             # Read initial state
             initial_state = GPIO.input(pin)
-            print(f"[GPIO] Button {button_num} on pin {pin}: initial state={initial_state} (0=LOW, 1=HIGH)")
+            print(f"[GPIO] Button {button_num} on pin {pin}: initial state={initial_state} "
+                  f"(0=unpressed/LOW, 1=pressed/HIGH)")
         
         print(f"[GPIO] Buttons ready on pins {list(self.pin_map.values())}, "
               f"hold_time={self.hold_time_ms}ms, confirmation={self.confirmation_count} polls, "
               f"startup_delay={self.startup_delay_ms}ms")
+        print("[GPIO] Using active-HIGH button logic (pin goes HIGH when pressed)")
 
     def _start_polling(self):
         """Start polling pins using Qt timer after startup grace period."""
@@ -125,7 +128,8 @@ class HardwareButtons:
         print("[GPIO] Startup grace period ended - buttons now active")
 
     def _poll_pins(self):
-        """Poll all pins with multi-stage confirmation to filter noise."""
+        """Poll all pins with multi-stage confirmation to filter noise.
+        Active-HIGH logic: pin is HIGH (1) when pressed."""
         # Skip polling during startup grace period
         if self.startup_grace_active:
             return
@@ -133,24 +137,25 @@ class HardwareButtons:
         for button_num, pin in self.pin_map.items():
             pin_state = GPIO.input(pin)
             
-            if pin_state == 1:  # Pin is HIGH
+            # Active-HIGH: Button pressed when pin is HIGH (1)
+            if pin_state == 1:  # Pin is HIGH (button pressed)
                 self.pin_consecutive_high[pin] += 1
                 self.pin_hold_time[pin] += self.poll_interval_ms
                 
-                # Stage 1: Require N consecutive HIGH readings to confirm pin is really HIGH
+                # Stage 1: Require N consecutive HIGH readings to confirm button press
                 if self.pin_consecutive_high[pin] < self.confirmation_count:
                     continue
                 
                 # Stage 2: Require minimum hold duration
                 if self.pin_hold_time[pin] >= self.hold_time_ms and not self.pin_pressed_triggered[pin]:
-                    print(f"[GPIO] Button {button_num} confirmed HIGH for {self.pin_hold_time[pin]}ms "
+                    print(f"[GPIO] Button {button_num} confirmed PRESSED (HIGH) for {self.pin_hold_time[pin]}ms "
                           f"(after {self.pin_consecutive_high[pin]} consecutive polls) -> PRESS REGISTERED")
                     self.pin_pressed_triggered[pin] = True
                     try:
                         self.callback(button_num)
                     except Exception as exc:
                         print(f"[GPIO] Button handler error: {exc}")
-            else:  # Pin is LOW
+            else:  # Pin is LOW (button not pressed)
                 if self.pin_hold_time[pin] > 0:
                     held_time = self.pin_hold_time[pin]
                     consecutive = self.pin_consecutive_high[pin]
@@ -160,7 +165,7 @@ class HardwareButtons:
                     elif held_time < self.hold_time_ms:
                         print(f"[GPIO] Button {button_num} released after {held_time}ms (ignored - too brief)")
                 
-                # Reset counters when pin goes LOW
+                # Reset counters when pin goes LOW (button released)
                 self.pin_hold_time[pin] = 0
                 self.pin_consecutive_high[pin] = 0
                 self.pin_pressed_triggered[pin] = False
