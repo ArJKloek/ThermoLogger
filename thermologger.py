@@ -63,17 +63,21 @@ class HardwareButtons:
     Requires sustained, confirmed HIGH state to register a press."""
 
     def __init__(self, callback, pin_map=None, hold_time_ms=1000, poll_interval_ms=50, 
-                 confirmation_count=3):
+                 confirmation_count=3, startup_delay_ms=2000):
         self.callback = callback
         self.pin_map = pin_map or {1: 16, 2: 13, 3: 15, 4: 31}  # BOARD numbering
         self.hold_time_ms = hold_time_ms
         self.poll_interval_ms = poll_interval_ms
-        self.confirmation_count = confirmation_count  # Require N consecutive HIGH readings
+        self.confirmation_count = confirmation_count
+        self.startup_delay_ms = startup_delay_ms
         
         # Track how long each pin has been held HIGH
         self.pin_hold_time = {pin: 0 for pin in self.pin_map.values()}
         self.pin_consecutive_high = {pin: 0 for pin in self.pin_map.values()}
         self.pin_pressed_triggered = {pin: False for pin in self.pin_map.values()}
+        
+        # Startup grace period flag
+        self.startup_grace_active = True
         
         if GPIO is None:
             raise RuntimeError("RPi.GPIO not available")
@@ -91,17 +95,41 @@ class HardwareButtons:
             print(f"[GPIO] Button {button_num} on pin {pin}: initial state={initial_state} (0=LOW, 1=HIGH)")
         
         print(f"[GPIO] Buttons ready on pins {list(self.pin_map.values())}, "
-              f"hold_time={self.hold_time_ms}ms, confirmation={self.confirmation_count} polls")
+              f"hold_time={self.hold_time_ms}ms, confirmation={self.confirmation_count} polls, "
+              f"startup_delay={self.startup_delay_ms}ms")
 
     def _start_polling(self):
-        """Start polling pins using Qt timer."""
+        """Start polling pins using Qt timer after startup grace period."""
         from PyQt5.QtCore import QTimer
+        
+        # Start grace period timer first
+        self.grace_timer = QTimer()
+        self.grace_timer.setSingleShot(True)
+        self.grace_timer.timeout.connect(self._end_grace_period)
+        self.grace_timer.start(self.startup_delay_ms)
+        print(f"[GPIO] Startup grace period active for {self.startup_delay_ms}ms - buttons disabled")
+        
+        # Start polling timer (but it won't trigger presses during grace period)
         self.poll_timer = QTimer()
         self.poll_timer.timeout.connect(self._poll_pins)
         self.poll_timer.start(self.poll_interval_ms)
 
+    def _end_grace_period(self):
+        """End the startup grace period and enable button detection."""
+        self.startup_grace_active = False
+        # Clear any accumulated state during grace period
+        for pin in self.pin_map.values():
+            self.pin_hold_time[pin] = 0
+            self.pin_consecutive_high[pin] = 0
+            self.pin_pressed_triggered[pin] = False
+        print("[GPIO] Startup grace period ended - buttons now active")
+
     def _poll_pins(self):
         """Poll all pins with multi-stage confirmation to filter noise."""
+        # Skip polling during startup grace period
+        if self.startup_grace_active:
+            return
+        
         for button_num, pin in self.pin_map.items():
             pin_state = GPIO.input(pin)
             
@@ -141,6 +169,8 @@ class HardwareButtons:
         try:
             if hasattr(self, 'poll_timer'):
                 self.poll_timer.stop()
+            if hasattr(self, 'grace_timer'):
+                self.grace_timer.stop()
             GPIO.cleanup()
             print("[GPIO] Cleanup complete")
         except Exception as exc:
