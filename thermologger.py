@@ -418,8 +418,9 @@ class MainWindow(QMainWindow):
             self.action20.triggered.connect(lambda: self.set_logging_interval(20))
         if hasattr(self, 'action1_min'):
             self.action1_min.triggered.connect(lambda: self.set_logging_interval(60))
-        if hasattr(self, 'actionSettings'):
-            self.actionSettings.triggered.connect(self.show_settings)
+        # Hook the settings menu item to open the configuration dialog
+        if hasattr(self, 'actionConfiguration'):
+            self.actionConfiguration.triggered.connect(self.open_settings)
         if hasattr(self, 'actionShowPlot'):
             self.actionShowPlot.triggered.connect(self.show_plot_window)
 
