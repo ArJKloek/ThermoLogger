@@ -507,16 +507,9 @@ class EpaperDisplay:
                 plot_img, px, py = plot_result
                 image.paste(plot_img, (px, py))
 
-            # Partial refresh: when flashing, limit region to the channel area for speed
-            region_x = 0
-            region_y = max(0, self.data_start_y - 10)
-            region_w = max(10, left_width)
-            region_h = max(10, self.height - region_y - 5)
-
-            if self.flash_ticks > 0:
-                x, y, w, h = region_x, region_y, region_w, region_h
-            else:
-                x, y, w, h = 0, 0, self.width, self.height
+            # Use full-screen partial refresh. Limiting to a sub-region caused
+            # stretched/zoomed visuals on hardware during flash cycles.
+            x, y, w, h = 0, 0, self.width, self.height
 
             # Partial refresh the chosen region (partial mode was already activated in init_display)
             self.epd.display_Partial(
