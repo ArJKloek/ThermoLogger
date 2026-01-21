@@ -380,6 +380,10 @@ class MainWindow(QMainWindow):
         # Create plot window (initially hidden)
         self.plot_window = None
         
+        # Time range cycling for e-paper graph: 1h → 2h → 15min → 30min → 1h
+        self.graph_time_ranges = [1.0, 2.0, 0.25, 0.5]  # in hours
+        self.graph_time_range_index = 0  # Start with 1 hour
+        
         # Route all button events through a signal to keep UI thread-safe
         self.button_pressed.connect(self.handle_virtual_button)
         
@@ -439,7 +443,7 @@ class MainWindow(QMainWindow):
         self.buttons_layout.setSpacing(12)
 
         self.soft_buttons = []
-        button_labels = ["Start/Pause", "Reset", "Check TC", "(Reserved)"]
+        button_labels = ["Start/Pause", "Reset", "Check TC", "Time Range"]
         for idx in range(1, 5):
             button = QPushButton(button_labels[idx - 1])
             button.setObjectName(f"softButton{idx}")
@@ -507,10 +511,9 @@ class MainWindow(QMainWindow):
             print(f"[BUTTON] Button 3: Check TC")
             self.recheck_thermocouples()
         elif button_index == 4:
-            # Reserved for future use
-            print(f"[BUTTON] Button 4: Reserved")
-            if hasattr(self, 'statusbar'):
-                self.statusbar.showMessage("Button 4: Reserved", 1500)
+            # Cycle through graph time ranges: 1h → 2h → 15min → 30min → 1h
+            print(f"[BUTTON] Button 4: Time Range cycle")
+            self.cycle_graph_time_range()
 
     def start_worker(self):
         """Start the background reader thread."""
@@ -694,6 +697,28 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'statusbar'):
             self.statusbar.showMessage("Logging reset - new file will be created on start", 3000)
         print("[LOGGING] Reset - new file will be created on next start")
+
+    def cycle_graph_time_range(self):
+        """Cycle through graph time ranges: 1h → 2h → 15min → 30min → 1h."""
+        # Advance to next time range in cycle
+        self.graph_time_range_index = (self.graph_time_range_index + 1) % len(self.graph_time_ranges)
+        new_range = self.graph_time_ranges[self.graph_time_range_index]
+        
+        # Update e-paper display with new time range
+        self.epaper.set_time_range(new_range)
+        
+        # Format display message
+        if new_range >= 1.0:
+            range_text = f"{int(new_range)} hour{'s' if new_range > 1 else ''}"
+        else:
+            range_text = f"{int(new_range * 60)} minutes"
+        
+        print(f"[TIME RANGE] Graph time range changed to: {range_text}")
+        if hasattr(self, 'statusbar'):
+            self.statusbar.showMessage(f"Graph time range: {range_text}", 2000)
+        
+        # Refresh e-paper display immediately to show new time range
+        self.update_epaper_display()
 
         # Show "reset" briefly, then revert to default OFF status
         QTimer.singleShot(2000, self.clear_epaper_status)

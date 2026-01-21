@@ -67,6 +67,7 @@ class EpaperDisplay:
         self.status_message: Optional[str] = None  # Custom status line for events (paused/reset)
         self.flash_ticks: int = 0  # Remaining flash cycles for channel highlight
         self.flash_phase: bool = False  # Toggle state for flashing effect
+        self.time_range_hours: float = 1.0  # Time range for graph (1, 2, 0.25, 0.5 hours)
 
         print(f"[EPAPER] EpaperDisplay __init__, HAS_EPAPER={HAS_EPAPER}")
         
@@ -201,6 +202,11 @@ class EpaperDisplay:
         """Set history deque for plotting (expects list of (datetime, readings))."""
         self.history = list(history) if history else []
 
+    def set_time_range(self, hours: float):
+        """Set the time range for the graph (in hours)."""
+        self.time_range_hours = hours
+        print(f"[EPAPER] Graph time range set to {hours} hour(s)")
+
     def start_flash_channels(self, cycles: int = 6):
         """Start a short flashing effect on channel labels during checks."""
         self.flash_ticks = max(0, cycles)
@@ -247,7 +253,7 @@ class EpaperDisplay:
         return font_medium, font_unit, font_tc, font_digital
 
     def _draw_plot(self, draw: ImageDraw.ImageDraw, enabled_indices: List[int], x: int, y: int, w: int, h: int):
-        """Draw matplotlib plot of last hour for enabled channels (excluding unplugged)."""
+        """Draw matplotlib plot for enabled channels (excluding unplugged) using configured time range."""
         if not self.history or not enabled_indices:
             return None
 
@@ -257,7 +263,7 @@ class EpaperDisplay:
         if not plot_indices:
             return None
 
-        cutoff = datetime.now() - timedelta(hours=1)
+        cutoff = datetime.now() - timedelta(hours=self.time_range_hours)
         series_times = []
         series_values = [[] for _ in plot_indices]
 
@@ -310,10 +316,10 @@ class EpaperDisplay:
         # Configure axes
         ax.set_ylim(vmin, vmax)
         
-        # Fix x-axis to exactly 1 hour: (now - 1 hour) to now
+        # Fix x-axis to configured time range
         now = datetime.now()
-        one_hour_ago = now - timedelta(hours=1)
-        ax.set_xlim(one_hour_ago, now)
+        time_ago = now - timedelta(hours=self.time_range_hours)
+        ax.set_xlim(time_ago, now)
         
         ax.set_ylabel('Temperature (°C)', fontsize=8)
         ax.set_xlabel('Time', fontsize=8)
@@ -328,7 +334,15 @@ class EpaperDisplay:
         
         # Format time axis to show clock times (HH:MM)
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-        ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=15))
+        # Set tick interval based on time range
+        if self.time_range_hours <= 0.25:  # 15 min
+            ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=3))
+        elif self.time_range_hours <= 0.5:  # 30 min
+            ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=5))
+        elif self.time_range_hours <= 1.0:  # 1 hour
+            ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=15))
+        else:  # 2+ hours
+            ax.xaxis.set_major_locator(mdates.MinuteLocator(interval=30))
         fig.autofmt_xdate(rotation=0, ha='center')
         
         # Use subplots_adjust for consistent positioning instead of tight_layout
