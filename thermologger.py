@@ -59,11 +59,10 @@ def load_fonts():
 
 
 class HardwareButtons:
-    """Configure Raspberry Pi GPIO buttons with robust noise filtering via polling.
-    Requires sustained, confirmed HIGH state to register a press."""
+    """Configure Raspberry Pi GPIO buttons (active-LOW) with light debounce."""
 
-    def __init__(self, callback, pin_map=None, hold_time_ms=800, poll_interval_ms=50, 
-                 confirmation_count=5, startup_delay_ms=2000):
+    def __init__(self, callback, pin_map=None, hold_time_ms=200, poll_interval_ms=50, 
+                 confirmation_count=2, startup_delay_ms=2000):
         self.callback = callback
         self.pin_map = pin_map or {1: 16, 2: 13, 3: 15, 4: 31}  # BOARD numbering
         self.hold_time_ms = hold_time_ms
@@ -71,9 +70,9 @@ class HardwareButtons:
         self.confirmation_count = confirmation_count
         self.startup_delay_ms = startup_delay_ms
         
-        # Track how long each pin has been held HIGH
+        # Track how long each pin has been held LOW (pressed)
         self.pin_hold_time = {pin: 0 for pin in self.pin_map.values()}
-        self.pin_consecutive_high = {pin: 0 for pin in self.pin_map.values()}
+        self.pin_consecutive_low = {pin: 0 for pin in self.pin_map.values()}
         self.pin_pressed_triggered = {pin: False for pin in self.pin_map.values()}
         
         # Startup grace period flag
@@ -88,18 +87,18 @@ class HardwareButtons:
     def _setup(self):
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BOARD)
-        for button_num, pin in self.pin_map.items():
-            # Buttons are active-HIGH with pull-down (like test_button.py)
-            GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+          for button_num, pin in self.pin_map.items():
+            # Buttons are active-LOW with pull-up
+            GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
             # Read initial state
             initial_state = GPIO.input(pin)
             print(f"[GPIO] Button {button_num} on pin {pin}: initial state={initial_state} "
-                  f"(0=unpressed/LOW, 1=pressed/HIGH)")
+                f"(0=pressed/LOW, 1=unpressed/HIGH)")
         
-        print(f"[GPIO] Buttons ready on pins {list(self.pin_map.values())}, "
+          print(f"[GPIO] Buttons ready on pins {list(self.pin_map.values())}, "
               f"hold_time={self.hold_time_ms}ms, confirmation={self.confirmation_count} polls, "
               f"startup_delay={self.startup_delay_ms}ms")
-        print("[GPIO] Using active-HIGH button logic (pin goes HIGH when pressed)")
+          print("[GPIO] Using active-LOW button logic (pin goes LOW when pressed)")
 
     def _start_polling(self):
         """Start polling pins using Qt timer after startup grace period."""
@@ -121,18 +120,17 @@ class HardwareButtons:
         """End the startup grace period and enable button detection."""
         self.startup_grace_active = False
         
-        # Sanity check: verify pins are at expected LOW state
-        # If all pins are HIGH at startup, buttons are likely unusable due to noise/wiring
-        high_count = 0
+        # Sanity check for active-LOW: unpressed should be HIGH. If many are LOW, wiring/noise.
+        low_count = 0
         for button_num, pin in self.pin_map.items():
             state = GPIO.input(pin)
-            if state == 1:
-                high_count += 1
-                print(f"[GPIO] WARNING: Button {button_num} (pin {pin}) is HIGH at startup - unexpected!")
+            if state == 0:
+                low_count += 1
+                print(f"[GPIO] WARNING: Button {button_num} (pin {pin}) is LOW at startup - unexpected!")
         
-        if high_count >= 3:
-            print(f"[GPIO] ERROR: {high_count}/4 pins are HIGH at startup - buttons DISABLED due to wiring/noise issue")
-            print("[GPIO] Fix: Add external 10kΩ pull-down resistors or check wiring")
+        if low_count >= 3:
+            print(f"[GPIO] ERROR: {low_count}/4 pins are LOW at startup - buttons DISABLED due to wiring/noise issue")
+            print("[GPIO] Fix: Check wiring or add proper pull-ups")
             self.startup_grace_active = True  # Keep grace period active = buttons stay disabled
             return
         
@@ -145,7 +143,7 @@ class HardwareButtons:
 
     def _poll_pins(self):
         """Poll all pins with multi-stage confirmation to filter noise.
-        Active-HIGH logic: pin is HIGH (1) when pressed."""
+        Active-LOW logic: pin is LOW (0) when pressed."""
         # Skip polling during startup grace period
         if self.startup_grace_active:
             return
@@ -153,37 +151,37 @@ class HardwareButtons:
         for button_num, pin in self.pin_map.items():
             pin_state = GPIO.input(pin)
             
-            # Active-HIGH: Button pressed when pin is HIGH (1)
-            if pin_state == 1:  # Pin is HIGH (button pressed)
-                self.pin_consecutive_high[pin] += 1
+            # Active-LOW: Button pressed when pin is LOW (0)
+            if pin_state == 0:  # Pin is LOW (button pressed)
+                self.pin_consecutive_low[pin] += 1
                 self.pin_hold_time[pin] += self.poll_interval_ms
                 
-                # Stage 1: Require N consecutive HIGH readings to confirm button press
-                if self.pin_consecutive_high[pin] < self.confirmation_count:
+                # Stage 1: Require N consecutive LOW readings to confirm button press
+                if self.pin_consecutive_low[pin] < self.confirmation_count:
                     continue
                 
                 # Stage 2: Require minimum hold duration
                 if self.pin_hold_time[pin] >= self.hold_time_ms and not self.pin_pressed_triggered[pin]:
-                    print(f"[GPIO] Button {button_num} confirmed PRESSED (HIGH) for {self.pin_hold_time[pin]}ms "
-                          f"(after {self.pin_consecutive_high[pin]} consecutive polls) -> PRESS REGISTERED")
+                    print(f"[GPIO] Button {button_num} confirmed PRESSED (LOW) for {self.pin_hold_time[pin]}ms "
+                          f"(after {self.pin_consecutive_low[pin]} consecutive polls) -> PRESS REGISTERED")
                     self.pin_pressed_triggered[pin] = True
                     try:
                         self.callback(button_num)
                     except Exception as exc:
                         print(f"[GPIO] Button handler error: {exc}")
-            else:  # Pin is LOW (button not pressed)
+            else:  # Pin is HIGH (button not pressed)
                 if self.pin_hold_time[pin] > 0:
                     held_time = self.pin_hold_time[pin]
-                    consecutive = self.pin_consecutive_high[pin]
+                    consecutive = self.pin_consecutive_low[pin]
                     if consecutive < self.confirmation_count:
                         print(f"[GPIO] Button {button_num} noise spike: {held_time}ms, "
                               f"{consecutive} polls (< {self.confirmation_count}) - filtered")
                     elif held_time < self.hold_time_ms:
                         print(f"[GPIO] Button {button_num} released after {held_time}ms (ignored - too brief)")
                 
-                # Reset counters when pin goes LOW (button released)
+                # Reset counters when pin goes HIGH (button released)
                 self.pin_hold_time[pin] = 0
-                self.pin_consecutive_high[pin] = 0
+                self.pin_consecutive_low[pin] = 0
                 self.pin_pressed_triggered[pin] = False
 
     def cleanup(self):
