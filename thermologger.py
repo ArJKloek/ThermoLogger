@@ -5,9 +5,15 @@ from collections import deque
 from datetime import datetime, timedelta
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QGridLayout, QLabel, QHBoxLayout, QPushButton
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QFontDatabase, QPixmap, QImage, QPainter, QFont
 from PyQt5 import uic
+
+# Optional GPIO support for physical buttons (only on Raspberry Pi)
+try:
+    import RPi.GPIO as GPIO
+except Exception:
+    GPIO = None
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -50,6 +56,40 @@ def load_fonts():
                         print(f"Loaded system font: {font_file.name}")
                 except Exception as e:
                     pass
+
+
+class HardwareButtons:
+    """Configure Raspberry Pi GPIO buttons and forward presses to a callback."""
+
+    def __init__(self, callback, pin_map=None, bouncetime=200):
+        self.callback = callback
+        self.pin_map = pin_map or {1: 16, 2: 13, 3: 15, 4: 31}  # BOARD numbering
+        self.bouncetime = bouncetime
+        if GPIO is None:
+            raise RuntimeError("RPi.GPIO not available")
+        self._setup()
+
+    def _setup(self):
+        GPIO.setwarnings(False)
+        GPIO.setmode(GPIO.BOARD)
+        for button_num, pin in self.pin_map.items():
+            GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+            GPIO.add_event_detect(pin, GPIO.RISING,
+                                  callback=lambda channel, b=button_num: self._on_press(b),
+                                  bouncetime=self.bouncetime)
+        print(f"[GPIO] Buttons ready on pins {list(self.pin_map.values())}")
+
+    def _on_press(self, button_num: int):
+        try:
+            self.callback(button_num)
+        except Exception as exc:
+            print(f"[GPIO] Button handler error: {exc}")
+
+    def cleanup(self):
+        try:
+            GPIO.cleanup()
+        except Exception as exc:
+            print(f"[GPIO] Cleanup error: {exc}")
 
 
 class SensorWidget(QWidget):
@@ -205,6 +245,7 @@ class EpaperPreviewWindow(QWidget):
 
 class MainWindow(QMainWindow):
     """Main application window for Atlas Logger."""
+    button_pressed = pyqtSignal(int)  # Emitted for both GPIO and on-screen buttons
     
     def __init__(self):
         super().__init__()
@@ -224,6 +265,7 @@ class MainWindow(QMainWindow):
         self.logging_timer = QTimer()
         self.logging_timer.timeout.connect(self.on_logging_timer)
         self.logging_interval = 5  # Default 5 seconds
+        self.gpio_buttons = None
         
         # Create e-paper preview window if enabled in settings
         self.preview_window = None
@@ -233,6 +275,9 @@ class MainWindow(QMainWindow):
         
         # Create plot window (initially hidden)
         self.plot_window = None
+        
+        # Route all button events through a signal to keep UI thread-safe
+        self.button_pressed.connect(self.handle_virtual_button)
         
         self.init_ui()
     
@@ -266,6 +311,9 @@ class MainWindow(QMainWindow):
 
         # Connect menu actions
         self.connect_logging_controls()
+
+        # Wire hardware GPIO buttons (if available)
+        self._init_gpio_buttons()
 
         # Start background reader (uses dummy data when hardware is absent)
         self.start_worker()
@@ -323,10 +371,10 @@ class MainWindow(QMainWindow):
         print(f"[BUTTON] Virtual button {button_index} pressed")
         if hasattr(self, 'statusbar'):
             self.statusbar.showMessage(f"Virtual button {button_index} pressed", 1500)
-        self.handle_virtual_button(button_index)
+        self.button_pressed.emit(button_index)
 
     def handle_virtual_button(self, button_index: int):
-        """Map virtual button presses to actions; adjust as needed for hardware."""
+        """Map button presses (UI or GPIO) to actions."""
         if button_index == 1:
             # Toggle start/pause logging
             if self.logger.is_logging:
@@ -448,6 +496,22 @@ class MainWindow(QMainWindow):
             self.actionConfiguration.triggered.connect(self.open_settings)
         if hasattr(self, 'actionShowPlot'):
             self.actionShowPlot.triggered.connect(self.show_plot_window)
+
+    def _init_gpio_buttons(self):
+        """Initialize hardware buttons on Raspberry Pi (if available)."""
+        if GPIO is None:
+            print("[GPIO] RPi.GPIO not available; hardware buttons disabled")
+            return
+        try:
+            self.gpio_buttons = HardwareButtons(callback=self.on_gpio_button)
+            print("[GPIO] Hardware buttons initialized")
+        except Exception as exc:
+            self.gpio_buttons = None
+            print(f"[GPIO] Failed to initialize hardware buttons: {exc}")
+
+    def on_gpio_button(self, button_index: int):
+        """GPIO callback wrapper to emit through the Qt signal."""
+        self.button_pressed.emit(button_index)
 
     def open_settings(self):
         """Open the settings dialog."""
@@ -572,6 +636,8 @@ class MainWindow(QMainWindow):
         self.epaper_update_timer.stop()
         if self.worker and self.worker.isRunning():
             self.worker.stop()
+        if self.gpio_buttons:
+            self.gpio_buttons.cleanup()
         if self.epaper:
             self.epaper.clear()  # Clear the e-paper screen
             self.epaper.sleep()
