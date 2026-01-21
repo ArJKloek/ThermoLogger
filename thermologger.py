@@ -58,6 +58,7 @@ class SensorWidget(QWidget):
     def __init__(self, sensor_name="Sensor", parent=None):
         super().__init__(parent)
         self.sensor_name = sensor_name
+        self.is_unplugged = False
         self.load_ui()
     
     def load_ui(self):
@@ -84,12 +85,25 @@ class SensorWidget(QWidget):
         """Update the sensor value display."""
         # Update the label_value with the temperature value
         if hasattr(self, 'label_value'):
+            if self.is_unplugged:
+                self.label_value.setText("-- °C")
+                return
             try:
                 numeric_value = float(value)
                 text = f"{numeric_value:.1f}°C"
             except (TypeError, ValueError):
                 text = "-- °C"
             self.label_value.setText(text)
+
+    def set_unplugged(self, unplugged: bool):
+        """Visually dim the widget when the channel is unplugged."""
+        self.is_unplugged = unplugged
+        if hasattr(self, 'label_name'):
+            self.label_name.setStyleSheet("color: #888;" if unplugged else "")
+        if hasattr(self, 'label_value'):
+            self.label_value.setStyleSheet("color: #888;" if unplugged else "")
+            if unplugged:
+                self.label_value.setText("-- °C")
 
 
 class PlotWindow(QWidget):
@@ -201,6 +215,7 @@ class MainWindow(QMainWindow):
         self.epaper = EpaperDisplay(settings_manager=self.settings_manager)
         self.logger = ThermoLogger(settings_manager=self.settings_manager)
         self.last_readings = []
+        self.unplugged_channels = []  # 1-based channel numbers reported by worker
         self.history = deque(maxlen=3600)  # store last hour at 1 Hz
         self.epaper_update_timer = QTimer()
         self.epaper_update_timer.timeout.connect(self.update_epaper_display)
@@ -344,15 +359,25 @@ class MainWindow(QMainWindow):
         
         # Pass unplugged channels to display after worker initialization
         if hasattr(self.worker, 'unplugged_channels'):
-            self.epaper.set_unplugged_channels(self.worker.unplugged_channels)
+            self.unplugged_channels = list(self.worker.unplugged_channels)
+            self.epaper.set_unplugged_channels(self.unplugged_channels)
+            self._update_unplugged_state()
 
     def on_unplugged_changed(self, unplugged_channels):
         """Handle changes in unplugged channel status."""
-        self.epaper.set_unplugged_channels(unplugged_channels)
+        self.unplugged_channels = list(unplugged_channels)
+        self.epaper.set_unplugged_channels(self.unplugged_channels)
+        self._update_unplugged_state()
         self.epaper.stop_flash_channels()
         self.epaper.set_logging_status(self.logger.is_logging, message=None)
         self.restore_epaper_update_interval()
         print(f"[DISPLAY] Updated unplugged channels: {unplugged_channels}")
+
+    def _update_unplugged_state(self):
+        """Refresh UI widgets to reflect unplugged channels."""
+        for idx, sensor in enumerate(self.sensors):
+            unplugged = (idx + 1) in self.unplugged_channels
+            sensor.set_unplugged(unplugged)
 
     def update_readings(self, readings):
         self.last_readings = readings
