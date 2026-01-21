@@ -515,6 +515,19 @@ class EpaperDisplay:
                     tc_type = self.settings_manager.get_channel_type(idx)
                     draw.text((x_pos + 320, y_pos_current + 35), tc_type, font=font_tc, fill=0)
 
+            # Draw time range label above the graph
+            if self.time_range_hours >= 1.0:
+                range_text = f"Time Range: {int(self.time_range_hours)} hour{'s' if self.time_range_hours > 1 else ''}"
+            else:
+                range_text = f"Time Range: {int(self.time_range_hours * 60)} minutes"
+            
+            # Position label centered above the plot area
+            range_label_bbox = draw.textbbox((0, 0), range_text, font=self.font_small)
+            range_label_width = range_label_bbox[2] - range_label_bbox[0]
+            range_label_x = plot_x + (right_width - range_label_width) // 2
+            range_label_y = self.data_start_y - 22  # Above the plot
+            draw.text((range_label_x, range_label_y), range_text, font=self.font_small, fill=0)
+
             # Plot last hour on the right using matplotlib
             plot_result = self._draw_plot(draw, enabled_indices, plot_x, self.data_start_y, right_width, plot_height)
             if plot_result:
