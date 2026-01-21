@@ -61,6 +61,7 @@ class ThermoThread(QThread):
     source_changed = pyqtSignal(str)
     error = pyqtSignal(str)
     unplugged_changed = pyqtSignal(list)  # Emits updated unplugged channels list
+    check_complete = pyqtSignal()  # Emits when thermocouple check completes (regardless of changes)
 
     def __init__(self, interval_sec: float = 1.0, channels: int = 8, settings_manager=None, parent=None):
         super().__init__(parent)
@@ -164,6 +165,9 @@ class ThermoThread(QThread):
                 self.unplugged_changed.emit(self.unplugged_channels)
         except Exception as e:
             print(f"[HARDWARE] Error checking unplugged status: {e}")
+        finally:
+            # Always emit check_complete, even if nothing changed
+            self.check_complete.emit()
 
     def run(self) -> None:  # pragma: no cover - involves timing and threads
         if self._startup_error:

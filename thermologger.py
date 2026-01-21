@@ -403,6 +403,7 @@ class MainWindow(QMainWindow):
         self.worker.source_changed.connect(self.on_source_changed)
         self.worker.error.connect(self.on_error)
         self.worker.unplugged_changed.connect(self.on_unplugged_changed)
+        self.worker.check_complete.connect(self.on_check_complete)
         self.worker.start()
         
         # Pass unplugged channels to display after worker initialization
@@ -426,6 +427,13 @@ class MainWindow(QMainWindow):
         for idx, sensor in enumerate(self.sensors):
             unplugged = (idx + 1) in self.unplugged_channels
             sensor.set_unplugged(unplugged)
+
+    def on_check_complete(self):
+        """Called when thermocouple check completes (after flash cycles end)."""
+        # Restore logging status on e-paper (removes "Rechecking TC..." message)
+        self.epaper.set_logging_status(self.logger.is_logging, message=None)
+        self.restore_epaper_update_interval()
+        self.update_epaper_display()
 
     def update_readings(self, readings):
         self.last_readings = readings
