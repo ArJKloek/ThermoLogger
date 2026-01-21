@@ -61,7 +61,7 @@ def load_fonts():
 class HardwareButtons:
     """Configure Raspberry Pi GPIO buttons and forward presses to a callback."""
 
-    def __init__(self, callback, pin_map=None, bouncetime=200):
+    def __init__(self, callback, pin_map=None, bouncetime=500):
         self.callback = callback
         self.pin_map = pin_map or {1: 16, 2: 13, 3: 15, 4: 31}  # BOARD numbering
         self.bouncetime = bouncetime
@@ -74,13 +74,19 @@ class HardwareButtons:
         GPIO.setmode(GPIO.BOARD)
         for button_num, pin in self.pin_map.items():
             GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+            # Read initial state
+            initial_state = GPIO.input(pin)
+            print(f"[GPIO] Button {button_num} on pin {pin}: initial state={initial_state} (0=LOW, 1=HIGH)")
+            
             GPIO.add_event_detect(pin, GPIO.RISING,
                                   callback=lambda channel, b=button_num: self._on_press(b),
                                   bouncetime=self.bouncetime)
         print(f"[GPIO] Buttons ready on pins {list(self.pin_map.values())}, debounce={self.bouncetime}ms")
 
     def _on_press(self, button_num: int):
-        print(f"[GPIO] Button {button_num} pressed (raw GPIO event)")
+        pin = self.pin_map[button_num]
+        pin_state = GPIO.input(pin)
+        print(f"[GPIO] Button {button_num} pressed on pin {pin} (pin state={pin_state})")
         try:
             self.callback(button_num)
         except Exception as exc:
