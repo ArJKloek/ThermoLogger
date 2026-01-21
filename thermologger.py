@@ -59,17 +59,20 @@ def load_fonts():
 
 
 class HardwareButtons:
-    """Configure Raspberry Pi GPIO buttons and forward presses to a callback.
-    Uses polling with hold-duration detection to filter out noise/capacitive coupling."""
+    """Configure Raspberry Pi GPIO buttons with robust noise filtering via polling.
+    Requires sustained, confirmed HIGH state to register a press."""
 
-    def __init__(self, callback, pin_map=None, hold_time_ms=500, poll_interval_ms=50):
+    def __init__(self, callback, pin_map=None, hold_time_ms=1000, poll_interval_ms=50, 
+                 confirmation_count=3):
         self.callback = callback
         self.pin_map = pin_map or {1: 16, 2: 13, 3: 15, 4: 31}  # BOARD numbering
         self.hold_time_ms = hold_time_ms
         self.poll_interval_ms = poll_interval_ms
+        self.confirmation_count = confirmation_count  # Require N consecutive HIGH readings
         
         # Track how long each pin has been held HIGH
         self.pin_hold_time = {pin: 0 for pin in self.pin_map.values()}
+        self.pin_consecutive_high = {pin: 0 for pin in self.pin_map.values()}
         self.pin_pressed_triggered = {pin: False for pin in self.pin_map.values()}
         
         if GPIO is None:
@@ -88,26 +91,32 @@ class HardwareButtons:
             print(f"[GPIO] Button {button_num} on pin {pin}: initial state={initial_state} (0=LOW, 1=HIGH)")
         
         print(f"[GPIO] Buttons ready on pins {list(self.pin_map.values())}, "
-              f"hold_time={self.hold_time_ms}ms, poll_interval={self.poll_interval_ms}ms")
+              f"hold_time={self.hold_time_ms}ms, confirmation={self.confirmation_count} polls")
 
     def _start_polling(self):
-        """Start polling pins using Qt timer (from main window's QTimer)."""
+        """Start polling pins using Qt timer."""
         from PyQt5.QtCore import QTimer
         self.poll_timer = QTimer()
         self.poll_timer.timeout.connect(self._poll_pins)
         self.poll_timer.start(self.poll_interval_ms)
 
     def _poll_pins(self):
-        """Poll all pins and check for sustained button holds."""
+        """Poll all pins with multi-stage confirmation to filter noise."""
         for button_num, pin in self.pin_map.items():
             pin_state = GPIO.input(pin)
             
             if pin_state == 1:  # Pin is HIGH
+                self.pin_consecutive_high[pin] += 1
                 self.pin_hold_time[pin] += self.poll_interval_ms
                 
-                # Check if hold time exceeded threshold and press not yet triggered
+                # Stage 1: Require N consecutive HIGH readings to confirm pin is really HIGH
+                if self.pin_consecutive_high[pin] < self.confirmation_count:
+                    continue
+                
+                # Stage 2: Require minimum hold duration
                 if self.pin_hold_time[pin] >= self.hold_time_ms and not self.pin_pressed_triggered[pin]:
-                    print(f"[GPIO] Button {button_num} held for {self.pin_hold_time[pin]}ms -> PRESS REGISTERED")
+                    print(f"[GPIO] Button {button_num} confirmed HIGH for {self.pin_hold_time[pin]}ms "
+                          f"(after {self.pin_consecutive_high[pin]} consecutive polls) -> PRESS REGISTERED")
                     self.pin_pressed_triggered[pin] = True
                     try:
                         self.callback(button_num)
@@ -116,10 +125,17 @@ class HardwareButtons:
             else:  # Pin is LOW
                 if self.pin_hold_time[pin] > 0:
                     held_time = self.pin_hold_time[pin]
-                    if held_time < self.hold_time_ms:
+                    consecutive = self.pin_consecutive_high[pin]
+                    if consecutive < self.confirmation_count:
+                        print(f"[GPIO] Button {button_num} noise spike: {held_time}ms, "
+                              f"{consecutive} polls (< {self.confirmation_count}) - filtered")
+                    elif held_time < self.hold_time_ms:
                         print(f"[GPIO] Button {button_num} released after {held_time}ms (ignored - too brief)")
-                    self.pin_hold_time[pin] = 0
-                    self.pin_pressed_triggered[pin] = False
+                
+                # Reset counters when pin goes LOW
+                self.pin_hold_time[pin] = 0
+                self.pin_consecutive_high[pin] = 0
+                self.pin_pressed_triggered[pin] = False
 
     def cleanup(self):
         try:
