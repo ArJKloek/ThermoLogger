@@ -442,7 +442,7 @@ class EpaperDisplay:
                 range_text = f"Range: {int(self.time_range_hours)}h"
             else:
                 range_text = f"Range: {int(self.time_range_hours * 60)}min"
-            draw.text((self.width - 120, 65), range_text, font=self.font_small, fill=0)
+            draw.text((self.width - 150, 65), range_text, font=self.font_small, fill=0)
 
             # Determine enabled channels
             if self.settings_manager:
