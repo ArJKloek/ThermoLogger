@@ -62,8 +62,8 @@ class HardwareButtons:
     """Configure Raspberry Pi GPIO buttons with robust noise filtering via polling.
     Requires sustained, confirmed HIGH state to register a press."""
 
-    def __init__(self, callback, pin_map=None, hold_time_ms=1000, poll_interval_ms=50, 
-                 confirmation_count=3, startup_delay_ms=2000):
+    def __init__(self, callback, pin_map=None, hold_time_ms=800, poll_interval_ms=50, 
+                 confirmation_count=5, startup_delay_ms=2000):
         self.callback = callback
         self.pin_map = pin_map or {1: 16, 2: 13, 3: 15, 4: 31}  # BOARD numbering
         self.hold_time_ms = hold_time_ms
@@ -120,6 +120,22 @@ class HardwareButtons:
     def _end_grace_period(self):
         """End the startup grace period and enable button detection."""
         self.startup_grace_active = False
+        
+        # Sanity check: verify pins are at expected LOW state
+        # If all pins are HIGH at startup, buttons are likely unusable due to noise/wiring
+        high_count = 0
+        for button_num, pin in self.pin_map.items():
+            state = GPIO.input(pin)
+            if state == 1:
+                high_count += 1
+                print(f"[GPIO] WARNING: Button {button_num} (pin {pin}) is HIGH at startup - unexpected!")
+        
+        if high_count >= 3:
+            print(f"[GPIO] ERROR: {high_count}/4 pins are HIGH at startup - buttons DISABLED due to wiring/noise issue")
+            print("[GPIO] Fix: Add external 10kΩ pull-down resistors or check wiring")
+            self.startup_grace_active = True  # Keep grace period active = buttons stay disabled
+            return
+        
         # Clear any accumulated state during grace period
         for pin in self.pin_map.values():
             self.pin_hold_time[pin] = 0

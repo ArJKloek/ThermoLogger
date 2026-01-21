@@ -19,9 +19,9 @@ def setup_pins():
     GPIO.setmode(GPIO.BOARD)
     
     for button_num, pin in BUTTON_PINS.items():
-        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
         initial_state = GPIO.input(pin)
-        print(f"Button {button_num} on pin {pin}: initial state={initial_state} (0=LOW, 1=HIGH)")
+        print(f"Button {button_num} on pin {pin}: initial state={initial_state} (0=pressed/LOW, 1=unpressed/HIGH)")
 
 def monitor_pins(poll_interval=0.1):
     """Monitor pin states continuously and report changes."""
@@ -41,7 +41,7 @@ def monitor_pins(poll_interval=0.1):
                 
                 # Report state changes
                 if current_state != last_states[pin]:
-                    state_name = "HIGH (pressed)" if current_state == 1 else "LOW (unpressed)"
+                    state_name = "LOW (pressed)" if current_state == 0 else "HIGH (unpressed)"
                     print(f"[{current_time}] Button {button_num} (pin {pin}): {last_states[pin]} -> {current_state} ({state_name})")
                     last_states[pin] = current_state
             
@@ -52,7 +52,7 @@ def monitor_pins(poll_interval=0.1):
         print("\nFinal pin states:")
         for button_num, pin in BUTTON_PINS.items():
             state = GPIO.input(pin)
-            state_name = "HIGH (pressed)" if state == 1 else "LOW (unpressed)"
+            state_name = "LOW (pressed)" if state == 0 else "HIGH (unpressed)"
             print(f"  Button {button_num} (pin {pin}): {state} ({state_name})")
 
 def main():
@@ -66,8 +66,8 @@ def main():
     
     print("\nConfiguration:")
     print("  - GPIO mode: BOARD")
-    print("  - Pull-down resistors: ENABLED")
-    print("  - Expected: LOW (0) when unpressed, HIGH (1) when pressed")
+    print("  - Pull-up resistors: ENABLED")
+    print("  - Expected: HIGH (1) when unpressed, LOW (0) when pressed (active-LOW)")
     
     monitor_pins()
     
