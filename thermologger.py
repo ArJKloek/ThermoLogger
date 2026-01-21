@@ -59,15 +59,24 @@ def load_fonts():
 
 
 class HardwareButtons:
-    """Configure Raspberry Pi GPIO buttons and forward presses to a callback."""
+    """Configure Raspberry Pi GPIO buttons and forward presses to a callback.
+    Uses polling with hold-duration detection to filter out noise/capacitive coupling."""
 
-    def __init__(self, callback, pin_map=None, bouncetime=500):
+    def __init__(self, callback, pin_map=None, hold_time_ms=500, poll_interval_ms=50):
         self.callback = callback
         self.pin_map = pin_map or {1: 16, 2: 13, 3: 15, 4: 31}  # BOARD numbering
-        self.bouncetime = bouncetime
+        self.hold_time_ms = hold_time_ms
+        self.poll_interval_ms = poll_interval_ms
+        
+        # Track how long each pin has been held HIGH
+        self.pin_hold_time = {pin: 0 for pin in self.pin_map.values()}
+        self.pin_pressed_triggered = {pin: False for pin in self.pin_map.values()}
+        
         if GPIO is None:
             raise RuntimeError("RPi.GPIO not available")
+        
         self._setup()
+        self._start_polling()
 
     def _setup(self):
         GPIO.setwarnings(False)
@@ -77,24 +86,47 @@ class HardwareButtons:
             # Read initial state
             initial_state = GPIO.input(pin)
             print(f"[GPIO] Button {button_num} on pin {pin}: initial state={initial_state} (0=LOW, 1=HIGH)")
-            
-            GPIO.add_event_detect(pin, GPIO.RISING,
-                                  callback=lambda channel, b=button_num: self._on_press(b),
-                                  bouncetime=self.bouncetime)
-        print(f"[GPIO] Buttons ready on pins {list(self.pin_map.values())}, debounce={self.bouncetime}ms")
+        
+        print(f"[GPIO] Buttons ready on pins {list(self.pin_map.values())}, "
+              f"hold_time={self.hold_time_ms}ms, poll_interval={self.poll_interval_ms}ms")
 
-    def _on_press(self, button_num: int):
-        pin = self.pin_map[button_num]
-        pin_state = GPIO.input(pin)
-        print(f"[GPIO] Button {button_num} pressed on pin {pin} (pin state={pin_state})")
-        try:
-            self.callback(button_num)
-        except Exception as exc:
-            print(f"[GPIO] Button handler error: {exc}")
+    def _start_polling(self):
+        """Start polling pins using Qt timer (from main window's QTimer)."""
+        from PyQt5.QtCore import QTimer
+        self.poll_timer = QTimer()
+        self.poll_timer.timeout.connect(self._poll_pins)
+        self.poll_timer.start(self.poll_interval_ms)
+
+    def _poll_pins(self):
+        """Poll all pins and check for sustained button holds."""
+        for button_num, pin in self.pin_map.items():
+            pin_state = GPIO.input(pin)
+            
+            if pin_state == 1:  # Pin is HIGH
+                self.pin_hold_time[pin] += self.poll_interval_ms
+                
+                # Check if hold time exceeded threshold and press not yet triggered
+                if self.pin_hold_time[pin] >= self.hold_time_ms and not self.pin_pressed_triggered[pin]:
+                    print(f"[GPIO] Button {button_num} held for {self.pin_hold_time[pin]}ms -> PRESS REGISTERED")
+                    self.pin_pressed_triggered[pin] = True
+                    try:
+                        self.callback(button_num)
+                    except Exception as exc:
+                        print(f"[GPIO] Button handler error: {exc}")
+            else:  # Pin is LOW
+                if self.pin_hold_time[pin] > 0:
+                    held_time = self.pin_hold_time[pin]
+                    if held_time < self.hold_time_ms:
+                        print(f"[GPIO] Button {button_num} released after {held_time}ms (ignored - too brief)")
+                    self.pin_hold_time[pin] = 0
+                    self.pin_pressed_triggered[pin] = False
 
     def cleanup(self):
         try:
+            if hasattr(self, 'poll_timer'):
+                self.poll_timer.stop()
             GPIO.cleanup()
+            print("[GPIO] Cleanup complete")
         except Exception as exc:
             print(f"[GPIO] Cleanup error: {exc}")
 
