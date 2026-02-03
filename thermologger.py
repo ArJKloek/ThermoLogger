@@ -361,7 +361,10 @@ class MainWindow(QMainWindow):
         self.logger = ThermoLogger(settings_manager=self.settings_manager)
         self.last_readings = []
         self.unplugged_channels = []  # 1-based channel numbers reported by worker
-        self.history = deque(maxlen=3600)  # store last hour at 1 Hz
+        # Store history with time-based cleanup (not just count-based)
+        # Increased maxlen to handle faster sampling rates safely
+        self.history = deque(maxlen=7200)  # 2 hours max at 1 Hz (safety buffer)
+        self.history_max_age_hours = 2.0  # Keep max 2 hours of data
         self.epaper_update_timer = QTimer()
         self.epaper_update_timer.timeout.connect(self.update_epaper_display)
         self.epaper_base_interval = 5000  # ms
@@ -370,6 +373,11 @@ class MainWindow(QMainWindow):
         self.logging_timer.timeout.connect(self.on_logging_timer)
         self.logging_interval = 5  # Default 5 seconds
         self.gpio_buttons = None
+        
+        # Periodic cleanup timer to prevent memory buildup
+        self.cleanup_timer = QTimer()
+        self.cleanup_timer.timeout.connect(self.cleanup_old_history)
+        self.cleanup_timer.start(60000)  # Clean up every minute
         
         # Create e-paper preview window if enabled in settings
         self.preview_window = None
@@ -553,11 +561,34 @@ class MainWindow(QMainWindow):
         self.epaper.set_logging_status(self.logger.is_logging, message=None)
         self.restore_epaper_update_interval()
         self.update_epaper_display()
+    
+    def cleanup_old_history(self):
+        """Remove history entries older than the configured max age to prevent memory buildup."""
+        if not self.history:
+            return
+        
+        cutoff_time = datetime.now() - timedelta(hours=self.history_max_age_hours)
+        
+        # Remove old entries from the left (oldest)
+        while self.history and self.history[0][0] < cutoff_time:
+            self.history.popleft()
+        
+        # Periodically log memory usage for debugging
+        history_size = len(self.history)
+        if history_size > 0:
+            oldest = self.history[0][0]
+            newest = self.history[-1][0]
+            age_minutes = (newest - oldest).total_seconds() / 60
+            print(f"[MEMORY] History: {history_size} entries, {age_minutes:.1f} min span")
 
     def update_readings(self, readings):
         self.last_readings = readings
+        
         # Store timestamped reading for plotting
-        self.history.append((datetime.now(), list(readings)))
+        # Use tuple of timestamp and tuple (not list) to save memory
+        current_time = datetime.now()
+        self.history.append((current_time, tuple(readings)))
+        
         for idx, value in enumerate(readings):
             if idx < len(self.sensors):
                 # Only update visible/enabled sensors
