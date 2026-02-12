@@ -23,6 +23,7 @@ from backend.thermo_worker import ThermoThread
 from backend.epaper_display import EpaperDisplay
 from backend.thermo_logger import ThermoLogger
 from backend.settings_manager import SettingsManager
+from backend.error_logger import ErrorLogger
 from ui.settings_dialog import SettingsDialog
 
 
@@ -405,34 +406,58 @@ class MainWindow(QMainWindow):
         
         # Check if UI file exists
         if not ui_file.exists():
-            print(f"Error: UI file not found at {ui_file}")
+            error_msg = f"UI file not found at {ui_file}"
+            print(f"Error: {error_msg}")
+            ErrorLogger.log_critical(error_msg)
             sys.exit(1)
         
         # Load the UI file using uic
         try:
             uic.loadUi(str(ui_file), self)
+            ErrorLogger.log_info("UI file loaded successfully")
         except Exception as e:
-            print(f"Error loading UI file: {e}")
+            error_msg = f"Error loading UI file: {e}"
+            print(f"Error: {error_msg}")
+            ErrorLogger.log_critical("Failed to load UI file", e)
             sys.exit(1)
         
         # Ensure menubar is visible (critical for Raspberry Pi / PyQt6)
         if hasattr(self, 'menubar'):
             self.menubar.setNativeMenuBar(False)
             self.menubar.setVisible(True)
+            ErrorLogger.log_info(f"Menubar configured: visible={self.menubar.isVisible()}")
             print(f"[MENU] Menubar configured: visible={self.menubar.isVisible()}")
         
         # Build layouts
-        self.setup_layouts()
-        self.setup_sensors()
+        try:
+            self.setup_layouts()
+            self.setup_sensors()
+            ErrorLogger.log_info("UI layouts and sensors configured")
+        except Exception as e:
+            ErrorLogger.log_error("Failed to setup layouts or sensors", e)
+            raise
 
         # Connect menu actions
-        self.connect_logging_controls()
+        try:
+            self.connect_logging_controls()
+            ErrorLogger.log_info("Logging controls connected")
+        except Exception as e:
+            ErrorLogger.log_error("Failed to connect logging controls", e)
+            raise
 
         # Wire hardware GPIO buttons (if available)
-        self._init_gpio_buttons()
+        try:
+            self._init_gpio_buttons()
+        except Exception as e:
+            ErrorLogger.log_warning("GPIO button initialization failed", e)
 
         # Start background reader (uses dummy data when hardware is absent)
-        self.start_worker()
+        try:
+            self.start_worker()
+            ErrorLogger.log_info("Worker thread started successfully")
+        except Exception as e:
+            ErrorLogger.log_error("Failed to start worker thread", e)
+            raise
     
     def setup_layouts(self):
         """Create main layout with sensors grid."""
@@ -827,18 +852,40 @@ class MainWindow(QMainWindow):
 
 def main():
     """Main entry point for the application."""
-    app = QApplication(sys.argv)
-    
-    # Load custom fonts
-    load_fonts()
-    
-    # Create and show main window
-    window = MainWindow()
-    window.show()
-    
-    # Run the application
-    sys.exit(app.exec_())
+    try:
+        # Initialize error logging first
+        error_logger = ErrorLogger()
+        ErrorLogger.log_info("=" * 80)
+        ErrorLogger.log_info("ThermoLogger application started")
+        ErrorLogger.log_info("=" * 80)
+        
+        app = QApplication(sys.argv)
+        
+        # Load custom fonts
+        try:
+            load_fonts()
+        except Exception as e:
+            ErrorLogger.log_error("Failed to load fonts", e)
+        
+        # Create and show main window
+        try:
+            window = MainWindow()
+            window.show()
+            ErrorLogger.log_info("Main window created and displayed successfully")
+        except Exception as e:
+            ErrorLogger.log_critical("Failed to create main window", e)
+            return 1
+        
+        # Run the application
+        exit_code = app.exec_()
+        ErrorLogger.log_info(f"Application exiting with code: {exit_code}")
+        return exit_code
+        
+    except Exception as e:
+        print(f"FATAL ERROR: {e}")
+        ErrorLogger.log_critical("Unhandled exception in main()", e)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

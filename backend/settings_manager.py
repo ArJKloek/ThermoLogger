@@ -7,6 +7,8 @@ import logging
 from pathlib import Path
 from typing import Dict, List
 
+from backend.error_logger import ErrorLogger
+
 
 class SettingsManager:
     """Manages application settings including thermocouple types."""
@@ -24,7 +26,9 @@ class SettingsManager:
     def load_settings(self) -> bool:
         """Load settings from JSON file."""
         if not self.settings_file.exists():
-            logging.info(f"Settings file not found at {self.settings_file}, using defaults")
+            msg = f"Settings file not found at {self.settings_file}, using defaults"
+            logging.info(msg)
+            ErrorLogger.log_info(f"[SETTINGS] {msg}")
             print(f"[SETTINGS] No settings file found, using defaults")
             return False
 
@@ -44,13 +48,17 @@ class SettingsManager:
                     self.channel_enabled.append(True)
                 self.channel_enabled = self.channel_enabled[:8]
                 
-                logging.info(f"Settings loaded from {self.settings_file}")
+                msg = f"Settings loaded from {self.settings_file}"
+                logging.info(msg)
+                ErrorLogger.log_info(f"[SETTINGS] {msg}")
                 print(f"[SETTINGS] Loaded from {self.settings_file}")
                 print(f"[SETTINGS] Channel types: {self.channel_types}")
                 print(f"[SETTINGS] Channel enabled: {self.channel_enabled}")
                 return True
         except Exception as e:
-            logging.error(f"Error loading settings: {e}")
+            error_msg = f"Error loading settings: {e}"
+            logging.error(error_msg)
+            ErrorLogger.log_error(f"[SETTINGS] {error_msg}", e)
             print(f"[SETTINGS ERROR] Failed to load: {e}")
             return False
 
@@ -64,13 +72,17 @@ class SettingsManager:
             }
             with open(self.settings_file, 'w') as f:
                 json.dump(data, f, indent=2)
-            logging.info(f"Settings saved to {self.settings_file}")
+            msg = f"Settings saved to {self.settings_file}"
+            logging.info(msg)
+            ErrorLogger.log_info(f"[SETTINGS] {msg}")
             print(f"[SETTINGS] Saved to {self.settings_file}")
             print(f"[SETTINGS] Channel types: {self.channel_types}")
             print(f"[SETTINGS] Channel enabled: {self.channel_enabled}")
             return True
         except Exception as e:
-            logging.error(f"Error saving settings: {e}")
+            error_msg = f"Error saving settings: {e}"
+            logging.error(error_msg)
+            ErrorLogger.log_error(f"[SETTINGS] {error_msg}", e)
             print(f"[SETTINGS ERROR] Failed to save: {e}")
             return False
 

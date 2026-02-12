@@ -8,6 +8,8 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Optional
 
+from backend.error_logger import ErrorLogger
+
 
 class ThermoLogger:
     """Handles CSV logging of temperature readings."""
@@ -26,7 +28,9 @@ class ThermoLogger:
     def start_logging(self) -> bool:
         """Start logging with a new CSV file for the current date."""
         if self.is_logging:
-            logging.warning("Logging already active")
+            msg = "Logging already active"
+            logging.warning(msg)
+            ErrorLogger.log_warning(msg)
             return False
 
         try:
@@ -54,21 +58,29 @@ class ThermoLogger:
             if not file_exists:
                 self.csv_writer = csv.writer(self.file_handle)
                 self.csv_writer.writerow(header)
-                print(f"[LOGGING] Created new log file: {self.csv_file}")
-                logging.info(f"Created new log file: {self.csv_file}")
+                msg = f"Created new log file: {self.csv_file}"
+                print(f"[LOGGING] {msg}")
+                logging.info(msg)
+                ErrorLogger.log_info(f"[LOGGING] {msg}")
             else:
                 self.csv_writer = csv.writer(self.file_handle)
-                print(f"[LOGGING] Appending to existing log file: {self.csv_file}")
-                logging.info(f"Appending to existing log file: {self.csv_file}")
+                msg = f"Appending to existing log file: {self.csv_file}"
+                print(f"[LOGGING] {msg}")
+                logging.info(msg)
+                ErrorLogger.log_info(f"[LOGGING] {msg}")
 
             self.is_logging = True
-            print(f"[LOGGING] Started logging to {self.csv_file}")
-            logging.info(f"Started logging to {self.csv_file}")
+            msg = f"Started logging to {self.csv_file}"
+            print(f"[LOGGING] {msg}")
+            logging.info(msg)
+            ErrorLogger.log_info(f"[LOGGING] {msg}")
             return True
 
         except Exception as e:
-            print(f"[LOGGING ERROR] Error starting logging: {e}")
-            logging.error(f"Error starting logging: {e}")
+            error_msg = f"Error starting logging: {e}"
+            print(f"[LOGGING ERROR] {error_msg}")
+            logging.error(error_msg)
+            ErrorLogger.log_error(f"[LOGGING] {error_msg}", e)
             self.is_logging = False
             return False
 
@@ -92,7 +104,9 @@ class ThermoLogger:
             self.csv_writer.writerow(row)
             self.file_handle.flush()  # Flush to ensure data is written
         except Exception as e:
-            logging.error(f"Error logging reading: {e}")
+            error_msg = f"Error logging reading: {e}"
+            logging.error(error_msg)
+            ErrorLogger.log_error(f"[LOGGING] {error_msg}", e)
 
     def stop_logging(self) -> None:
         """Stop logging and close the CSV file."""
@@ -103,9 +117,13 @@ class ThermoLogger:
             if self.file_handle:
                 self.file_handle.close()
             self.is_logging = False
-            logging.info("Stopped logging")
+            msg = "Stopped logging"
+            logging.info(msg)
+            ErrorLogger.log_info(f"[LOGGING] {msg}")
         except Exception as e:
-            logging.error(f"Error stopping logging: {e}")
+            error_msg = f"Error stopping logging: {e}"
+            logging.error(error_msg)
+            ErrorLogger.log_error(f"[LOGGING] {error_msg}", e)
 
     def get_log_file_path(self) -> Optional[Path]:
         """Return the current log file path."""

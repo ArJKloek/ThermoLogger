@@ -7,6 +7,8 @@ from typing import List
 
 from PyQt5.QtCore import QThread, pyqtSignal
 
+from backend.error_logger import ErrorLogger
+
 try:
     from perlin_noise import PerlinNoise
     HAS_PERLIN = True
@@ -84,6 +86,7 @@ class ThermoThread(QThread):
 
             self.device = sm_tc.SMtc(0)
             self.source = "hardware"
+            ErrorLogger.log_info("Initialized hardware SMtc device")
             
             # Configure thermocouple types from settings if available
             if self.settings_manager:
@@ -105,30 +108,31 @@ class ThermoThread(QThread):
                         tc_type_code = tc_type_map[tc_type_letter]
                         try:
                             self.device.set_sensor_type(channel + 1, tc_type_code)
-                            print(f"[HARDWARE] Set CH{channel + 1} to Type {tc_type_letter}")
+                            ErrorLogger.log_info(f"Set CH{channel + 1} to Type {tc_type_letter}")
                         except Exception as e:
-                            print(f"[HARDWARE] Failed to set CH{channel + 1} type: {e}")
+                            ErrorLogger.log_error(f"Failed to set CH{channel + 1} type", e)
             
             # Check for unplugged channels (0.00 mV voltage)
-            print("[HARDWARE] Checking for unplugged channels...")
+            ErrorLogger.log_info("Checking for unplugged channels...")
             self.unplugged_channels = []
             for ch in range(1, self.channels + 1):
                 try:
                     mv = self.device.get_mv(ch)
                     if mv == 0.0:
                         self.unplugged_channels.append(ch)
-                        print(f"[HARDWARE] CH{ch} unplugged (0.00 mV)")
+                        ErrorLogger.log_hardware_event(ch, "unplugged", "0.00 mV")
                 except Exception as e:
-                    print(f"[HARDWARE] Error checking CH{ch}: {e}")
+                    ErrorLogger.log_error(f"Error checking CH{ch} voltage", e)
             
             if self.unplugged_channels:
                 unplugged_str = ", ".join([f"CH{ch}" for ch in self.unplugged_channels])
-                print(f"[HARDWARE] Unplugged channels: {unplugged_str}")
+                ErrorLogger.log_info(f"Unplugged channels detected: {unplugged_str}")
             
         except Exception as exc:  # pragma: no cover - depends on hardware
             self.device = DummySMtc(self.channels)
             self.source = "dummy"
             self._startup_error = str(exc)
+            ErrorLogger.log_warning(f"Hardware initialization failed, falling back to dummy mode: {exc}", exc)
 
     def _check_unplugged_status(self) -> None:
         """Check voltage on all channels and update unplugged list if changed."""
@@ -142,8 +146,8 @@ class ThermoThread(QThread):
                     mv = self.device.get_mv(ch)
                     if mv == 0.0:
                         current_unplugged.append(ch)
-                except Exception:
-                    pass
+                except Exception as e:
+                    ErrorLogger.log_error(f"Error checking voltage on CH{ch}", e)
             
             # Check if the unplugged list changed
             if set(current_unplugged) != set(self.unplugged_channels):
@@ -154,31 +158,36 @@ class ThermoThread(QThread):
                 
                 if newly_connected:
                     connected_str = ", ".join([f"CH{ch}" for ch in sorted(newly_connected)])
-                    print(f"[HARDWARE] Channel(s) connected: {connected_str}")
+                    ErrorLogger.log_hardware_event(list(newly_connected)[0], "connected", connected_str)
                 
                 if newly_disconnected:
                     disconnected_str = ", ".join([f"CH{ch}" for ch in sorted(newly_disconnected)])
-                    print(f"[HARDWARE] Channel(s) disconnected: {disconnected_str}")
+                    ErrorLogger.log_hardware_event(list(newly_disconnected)[0], "disconnected", disconnected_str)
                 
                 # Update the list and emit signal
                 self.unplugged_channels = current_unplugged
                 self.unplugged_changed.emit(self.unplugged_channels)
         except Exception as e:
-            print(f"[HARDWARE] Error checking unplugged status: {e}")
+            ErrorLogger.log_error("Error checking unplugged status", e)
         finally:
             # Always emit check_complete, even if nothing changed
             self.check_complete.emit()
 
     def run(self) -> None:  # pragma: no cover - involves timing and threads
         if self._startup_error:
-            self.error.emit(f"Falling back to dummy: {self._startup_error}")
+            error_msg = f"Falling back to dummy: {self._startup_error}"
+            self.error.emit(error_msg)
+            ErrorLogger.log_warning(error_msg)
         
         self.source_changed.emit(self.source)
+        ErrorLogger.log_info(f"Temperature reading thread started, source: {self.source}")
         
         # Only show noise source info if we're using dummy data
         if self.source == "dummy":
             noise_source = "Perlin noise" if HAS_PERLIN else "sine wave (fallback)"
-            self.error.emit(f"Using {noise_source} for dummy data")
+            msg = f"Using {noise_source} for dummy data"
+            self.error.emit(msg)
+            ErrorLogger.log_info(msg)
 
         while not self._stop:
             readings: List[float] = []
@@ -187,7 +196,9 @@ class ThermoThread(QThread):
                     temp = self.device.get_temp(idx + 1)
                     readings.append(temp)
                 except Exception as exc:
-                    self.error.emit(str(exc))
+                    error_msg = str(exc)
+                    self.error.emit(error_msg)
+                    ErrorLogger.log_reading_error(idx + 1, error_msg)
                     readings.append(float("nan"))
             self.reading_ready.emit(readings)
             
