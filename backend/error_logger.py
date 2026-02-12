@@ -38,12 +38,12 @@ class ErrorLogger:
 
     def _setup_logging(self):
         """Set up logging configuration with both file and console handlers."""
-        # Create main logger
-        self._logger = logging.getLogger("ThermoLogger")
-        self._logger.setLevel(logging.DEBUG)
+        # Create main logger - store in class variable, not instance
+        logger = logging.getLogger("ThermoLogger")
+        logger.setLevel(logging.DEBUG)
 
         # Remove any existing handlers
-        self._logger.handlers.clear()
+        logger.handlers.clear()
 
         # Create formatter
         formatter = logging.Formatter(
@@ -53,27 +53,44 @@ class ErrorLogger:
 
         # File handler with rotation
         log_file = self.log_dir / "thermologger.log"
-        file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=self.max_bytes,
-            backupCount=5
-        )
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(formatter)
-        self._logger.addHandler(file_handler)
+        try:
+            file_handler = RotatingFileHandler(
+                str(log_file),
+                maxBytes=self.max_bytes,
+                backupCount=5
+            )
+            file_handler.setLevel(logging.DEBUG)
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+        except Exception as e:
+            print(f"Warning: Could not create file handler for logging: {e}", file=sys.stderr)
 
         # Console handler
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(formatter)
-        self._logger.addHandler(console_handler)
+        logger.addHandler(console_handler)
+
+        # Set class variable
+        ErrorLogger._logger = logger
 
     @classmethod
     def get_logger(cls) -> logging.Logger:
         """Get the logger instance."""
         if cls._logger is None:
-            instance = cls()
-            return cls._logger
+            # Create singleton instance to initialize logging
+            try:
+                instance = cls()
+            except Exception as e:
+                print(f"FATAL: Could not initialize ErrorLogger: {e}", file=sys.stderr)
+                # Return a minimal fallback logger
+                return logging.getLogger("ThermoLogger_Fallback")
+        
+        if cls._logger is None:
+            print(f"FATAL: Logger still None after initialization", file=sys.stderr)
+            # Return a minimal fallback logger
+            return logging.getLogger("ThermoLogger_Fallback")
+            
         return cls._logger
 
     @staticmethod
