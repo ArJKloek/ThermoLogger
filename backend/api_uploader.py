@@ -36,7 +36,7 @@ class MeasurementUploader:
         self.device_id = os.getenv("DEVICE_ID") or config.get("device_id")
         self.token = os.getenv("DEVICE_TOKEN") or config.get("device_token")
         self.timeout = timeout
-        self._queue = queue.Queue(maxsize=1)
+        self._queue = queue.Queue()
         self._stopping = threading.Event()
         self._thread = None
 
@@ -49,7 +49,7 @@ class MeasurementUploader:
         self._thread.start()
         ErrorLogger.log_info(f"API upload enabled: {self.api_url}/api/v1/measurements")
 
-    def submit(self, readings, settings_manager) -> bool:
+    def submit(self, readings, settings_manager, logging_on: bool) -> bool:
         """Queue enabled, finite channel readings for upload."""
         if not self._thread:
             return False
@@ -72,7 +72,7 @@ class MeasurementUploader:
                 "value": temperature,
                 "unit": "C",
                 "quality": "good",
-                "logging_on": True,
+                "logging_on": logging_on,
                 "metadata": {"channel_type": settings_manager.get_channel_type(channel)},
             })
 

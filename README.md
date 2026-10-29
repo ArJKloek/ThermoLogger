@@ -175,7 +175,7 @@ ThermoLogger can also send real sensor readings to the measurements API used by 
 }
 ```
 
-Upload `api_config.json` alongside the application when deploying to the Raspberry Pi, or create/edit it directly in the project root on the Pi. The file is ignored by Git because it contains a secret. Environment variables `API_URL`, `DEVICE_ID`, and `DEVICE_TOKEN`, when set, override the matching file values. Each batch is sent to `/api/v1/measurements` on the selected logging interval; only enabled channels with finite readings are uploaded. If either credential is blank, API upload is disabled and CSV logging continues normally. The device ID and token must also be configured on the API server.
+Upload `api_config.json` alongside the application when deploying to the Raspberry Pi, or create/edit it directly in the project root on the Pi. The file is ignored by Git because it contains a secret. Environment variables `API_URL`, `DEVICE_ID`, and `DEVICE_TOKEN`, when set, override the matching file values. Each new sensor sample is sent to `/api/v1/measurements` (about once per second), whether or not CSV logging is active; only enabled channels with finite readings are uploaded. The `logging_on` field reflects the current CSV logging state. If either credential is blank, API upload is disabled and CSV logging continues normally. The device ID and token must also be configured on the API server.
 
 ## Error Logging
 

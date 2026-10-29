@@ -637,6 +637,7 @@ class MainWindow(QMainWindow):
 
     def update_readings(self, readings):
         self.last_readings = readings
+        self.api_uploader.submit(readings, self.settings_manager, self.logger.is_logging)
         
         # Store timestamped reading for plotting
         # Use tuple of timestamp and tuple (not list) to save memory
@@ -863,7 +864,6 @@ class MainWindow(QMainWindow):
         if self.last_readings:
             from datetime import datetime
             self.logger.log_reading(self.last_readings)
-            self.api_uploader.submit(self.last_readings, self.settings_manager)
             self.epaper.set_logging_status(True, datetime.now(), message=None)
 
     def closeEvent(self, event):
