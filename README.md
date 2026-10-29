@@ -163,6 +163,20 @@ Timestamp,CH1,CH2,CH3,CH4,CH5,CH6,CH7,CH8
 - **Error Logs**: `Data/logs/thermologger.log`
 - **Settings**: `settings.json`
 
+### API Upload
+
+ThermoLogger can also send real sensor readings to the measurements API used by `test_post.py`. Copy `api_config.example.json` to `api_config.json` in the project root and fill in the API URL, device ID, and device token:
+
+```json
+{
+   "api_url": "http://your-api-server:8000",
+   "device_id": "your-device-id",
+   "device_token": "your-device-token"
+}
+```
+
+Upload `api_config.json` alongside the application when deploying to the Raspberry Pi, or create/edit it directly in the project root on the Pi. The file is ignored by Git because it contains a secret. Environment variables `API_URL`, `DEVICE_ID`, and `DEVICE_TOKEN`, when set, override the matching file values. Each batch is sent to `/api/v1/measurements` on the selected logging interval; only enabled channels with finite readings are uploaded. If either credential is blank, API upload is disabled and CSV logging continues normally. The device ID and token must also be configured on the API server.
+
 ## Error Logging
 
 Comprehensive error logging is built-in to help diagnose issues:

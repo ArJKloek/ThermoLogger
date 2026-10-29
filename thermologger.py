@@ -23,6 +23,7 @@ import matplotlib.dates as mdates
 from backend.thermo_worker import ThermoThread
 from backend.epaper_display import EpaperDisplay
 from backend.thermo_logger import ThermoLogger
+from backend.api_uploader import MeasurementUploader
 from backend.settings_manager import SettingsManager
 from backend.error_logger import ErrorLogger
 from ui.settings_dialog import SettingsDialog
@@ -387,6 +388,7 @@ class MainWindow(QMainWindow):
         self.settings_manager = SettingsManager()
         self.epaper = EpaperDisplay(settings_manager=self.settings_manager)
         self.logger = ThermoLogger(settings_manager=self.settings_manager)
+        self.api_uploader = MeasurementUploader()
         self.last_readings = []
         self.unplugged_channels = []  # 1-based channel numbers reported by worker
         # Store history with time-based cleanup (not just count-based)
@@ -861,11 +863,13 @@ class MainWindow(QMainWindow):
         if self.last_readings:
             from datetime import datetime
             self.logger.log_reading(self.last_readings)
+            self.api_uploader.submit(self.last_readings, self.settings_manager)
             self.epaper.set_logging_status(True, datetime.now(), message=None)
 
     def closeEvent(self, event):
         self.logging_timer.stop()
         self.logger.stop_logging()
+        self.api_uploader.close()
         self.epaper_update_timer.stop()
         if self.worker and self.worker.isRunning():
             self.worker.stop()
