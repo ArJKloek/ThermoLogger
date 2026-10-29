@@ -84,24 +84,28 @@ class ThermoLogger:
             self.is_logging = False
             return False
 
-    def log_reading(self, readings: List[float]) -> None:
+    def log_reading(self, readings: List[float], timestamp: Optional[datetime] = None) -> None:
         """Log a temperature reading to CSV - only enabled channels."""
+        self.log_readings([(timestamp or datetime.now(), readings)])
+
+    def log_readings(self, timestamped_readings) -> None:
+        """Log multiple timestamped readings and flush them as one write batch."""
         if not self.is_logging or not self.csv_writer:
             return
 
         try:
-            timestamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-            row = [timestamp]
-            
-            # Only log enabled channels
-            if self.settings_manager:
-                for i, temp in enumerate(readings):
-                    if self.settings_manager.is_channel_enabled(i):
-                        row.append(temp)
-            else:
-                row += readings
-                
-            self.csv_writer.writerow(row)
+            rows = []
+            for timestamp, readings in timestamped_readings:
+                row = [timestamp.strftime("%d-%m-%Y %H:%M:%S")]
+                if self.settings_manager:
+                    for i, temp in enumerate(readings):
+                        if self.settings_manager.is_channel_enabled(i):
+                            row.append(temp)
+                else:
+                    row += readings
+                rows.append(row)
+
+            self.csv_writer.writerows(rows)
             self.file_handle.flush()  # Flush to ensure data is written
         except Exception as e:
             error_msg = f"Error logging reading: {e}"

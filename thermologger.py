@@ -379,6 +379,10 @@ class EpaperPreviewWindow(QWidget):
 
 class MainWindow(QMainWindow):
     """Main application window for Atlas Logger."""
+    AUTO_LOG_START_TEMP_C = 50.0
+    AUTO_LOG_STOP_TEMP_C = 40.0
+    AUTO_LOG_MIN_DURATION_SECONDS = 30 * 60
+    AUTO_LOG_BACKFILL_MINUTES = 30
     button_pressed = pyqtSignal(int)  # Emitted for both GPIO and on-screen buttons
     uploaded_measurements = pyqtSignal(int)
     
@@ -390,6 +394,7 @@ class MainWindow(QMainWindow):
         self.settings_manager = SettingsManager()
         self.epaper = EpaperDisplay(settings_manager=self.settings_manager)
         self.logger = ThermoLogger(settings_manager=self.settings_manager)
+        self.logging_started_at = None
         self.uploaded_measurements.connect(self.record_uploaded_measurements)
         self.upload_events = deque()
         self.api_uploader = MeasurementUploader(on_uploaded=self.uploaded_measurements.emit)
@@ -639,13 +644,12 @@ class MainWindow(QMainWindow):
         
     def update_readings(self, readings):
         self.last_readings = readings
+        current_time = datetime.now()
+        self.history.append((current_time, tuple(readings)))
+        self.update_temperature_logging_safety(readings)
         self.api_uploader.submit(readings, self.settings_manager, self.logger.is_logging)
         
         # Store timestamped reading for plotting
-        # Use tuple of timestamp and tuple (not list) to save memory
-        current_time = datetime.now()
-        self.history.append((current_time, tuple(readings)))
-        
         for idx, value in enumerate(readings):
             if idx < len(self.sensors):
                 # Only update visible/enabled sensors
@@ -655,6 +659,38 @@ class MainWindow(QMainWindow):
         # Update plot window if open
         if self.plot_window and self.plot_window.isVisible():
             self.plot_window.update_plot(self.history, self.channel_count, self.settings_manager)
+
+    def update_temperature_logging_safety(self, readings):
+        if not readings:
+            return
+        try:
+            channel_one = float(readings[0])
+        except (TypeError, ValueError):
+            return
+        if not math.isfinite(channel_one):
+            return
+
+        if not self.logger.is_logging:
+            if channel_one > self.AUTO_LOG_START_TEMP_C and self.start_logging():
+                backfill_cutoff = datetime.now() - timedelta(minutes=self.AUTO_LOG_BACKFILL_MINUTES)
+                backfill = (
+                    (timestamp, values)
+                    for timestamp, values in self.history
+                    if timestamp >= backfill_cutoff
+                )
+                self.logger.log_readings(backfill)
+                if hasattr(self, 'statusbar'):
+                    self.statusbar.showMessage("Automatic logging started; buffered readings saved", 5000)
+            return
+
+        if (
+            channel_one < self.AUTO_LOG_STOP_TEMP_C
+            and self.logging_started_at is not None
+            and monotonic() - self.logging_started_at >= self.AUTO_LOG_MIN_DURATION_SECONDS
+        ):
+            self.stop_logging()
+            if hasattr(self, 'statusbar'):
+                self.statusbar.showMessage("Automatic logging stopped: CH1 below 40 C", 5000)
 
     def on_source_changed(self, source: str):
         message = f"Reading source: {source}"
@@ -747,7 +783,9 @@ class MainWindow(QMainWindow):
 
     def start_logging(self):
         """Start logging temperature data."""
-        self.logger.start_logging()
+        if not self.logger.start_logging():
+            return False
+        self.logging_started_at = monotonic()
         self.logging_timer.start(self.logging_interval * 1000)
         self.epaper.set_logging_status(True, message=None)
         if hasattr(self, 'actionStart'):
@@ -758,11 +796,13 @@ class MainWindow(QMainWindow):
             self.actionReset.setEnabled(True)
         if hasattr(self, 'statusbar'):
             self.statusbar.showMessage("Logging started", 3000)
+        return True
 
     def pause_logging(self):
         """Pause logging without closing the file."""
         self.logging_timer.stop()
         self.logger.stop_logging()
+        self.logging_started_at = None
         self.epaper.set_logging_status(False, message="Logging paused")
         if hasattr(self, 'statusbar'):
             self.statusbar.showMessage("Logging paused", 3000)
@@ -774,6 +814,7 @@ class MainWindow(QMainWindow):
         """Stop logging temperature data."""
         self.logging_timer.stop()
         self.logger.stop_logging()
+        self.logging_started_at = None
         self.epaper.set_logging_status(False, message="Logging stopped")
         if hasattr(self, 'actionStart'):
             self.actionStart.setEnabled(True)
@@ -786,6 +827,7 @@ class MainWindow(QMainWindow):
         """Reset logging (stop and prepare for new log file)."""
         self.logging_timer.stop()
         self.logger.stop_logging()
+        self.logging_started_at = None
         self.epaper.set_logging_status(False, message="Logging reset")
         if hasattr(self, 'actionStart'):
             self.actionStart.setEnabled(True)
