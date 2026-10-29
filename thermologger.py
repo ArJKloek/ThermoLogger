@@ -1,5 +1,6 @@
 import sys
 import xml.etree.ElementTree as ET
+from time import monotonic
 from pathlib import Path
 from collections import deque
 from datetime import datetime, timedelta
@@ -379,7 +380,7 @@ class EpaperPreviewWindow(QWidget):
 class MainWindow(QMainWindow):
     """Main application window for Atlas Logger."""
     button_pressed = pyqtSignal(int)  # Emitted for both GPIO and on-screen buttons
-    upload_count_changed = pyqtSignal(int)
+    uploaded_measurements = pyqtSignal(int)
     
     def __init__(self):
         super().__init__()
@@ -389,8 +390,9 @@ class MainWindow(QMainWindow):
         self.settings_manager = SettingsManager()
         self.epaper = EpaperDisplay(settings_manager=self.settings_manager)
         self.logger = ThermoLogger(settings_manager=self.settings_manager)
-        self.upload_count_changed.connect(self.update_upload_count)
-        self.api_uploader = MeasurementUploader(on_uploaded=self.upload_count_changed.emit)
+        self.uploaded_measurements.connect(self.record_uploaded_measurements)
+        self.upload_events = deque()
+        self.api_uploader = MeasurementUploader(on_uploaded=self.uploaded_measurements.emit)
         self.last_readings = []
         self.unplugged_channels = []  # 1-based channel numbers reported by worker
         # Store history with time-based cleanup (not just count-based)
@@ -404,6 +406,9 @@ class MainWindow(QMainWindow):
         self.logging_timer = QTimer()
         self.logging_timer.timeout.connect(self.on_logging_timer)
         self.logging_interval = 5  # Default 5 seconds
+        self.upload_rate_timer = QTimer()
+        self.upload_rate_timer.timeout.connect(self.update_upload_rate)
+        self.upload_rate_timer.start(1000)
         self.gpio_buttons = None
         
         # Periodic cleanup timer to prevent memory buildup
@@ -445,7 +450,7 @@ class MainWindow(QMainWindow):
         # Load the UI file using uic
         try:
             uic.loadUi(str(ui_file), self)
-            upload_label = "Uploaded: 0 readings" if self.api_uploader.enabled else "API upload disabled"
+            upload_label = "Uploaded: 0 readings/min" if self.api_uploader.enabled else "API upload disabled"
             self.upload_status_label = QLabel(upload_label)
             self.statusbar.addPermanentWidget(self.upload_status_label)
             ErrorLogger.log_info("UI file loaded successfully")
@@ -632,14 +637,6 @@ class MainWindow(QMainWindow):
         while self.history and self.history[0][0] < cutoff_time:
             self.history.popleft()
         
-        # Periodically log memory usage for debugging
-        history_size = len(self.history)
-        if history_size > 0:
-            oldest = self.history[0][0]
-            newest = self.history[-1][0]
-            age_minutes = (newest - oldest).total_seconds() / 60
-            print(f"[MEMORY] History: {history_size} entries, {age_minutes:.1f} min span")
-
     def update_readings(self, readings):
         self.last_readings = readings
         self.api_uploader.submit(readings, self.settings_manager, self.logger.is_logging)
@@ -670,8 +667,16 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'statusbar'):
             self.statusbar.showMessage(message, 5000)
 
-    def update_upload_count(self, count: int):
-        self.upload_status_label.setText(f"Uploaded: {count:,} readings")
+    def record_uploaded_measurements(self, count: int):
+        self.upload_events.append((monotonic(), count))
+        self.update_upload_rate()
+
+    def update_upload_rate(self):
+        cutoff = monotonic() - 60
+        while self.upload_events and self.upload_events[0][0] < cutoff:
+            self.upload_events.popleft()
+        uploaded_count = sum(count for _, count in self.upload_events)
+        self.upload_status_label.setText(f"Uploaded: {uploaded_count:,} readings/min")
 
     def update_epaper_display(self):
         """Update e-paper display with current readings."""
@@ -876,6 +881,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.logging_timer.stop()
+        self.upload_rate_timer.stop()
         self.logger.stop_logging()
         self.api_uploader.close()
         self.epaper_update_timer.stop()

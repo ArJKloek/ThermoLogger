@@ -37,7 +37,6 @@ class MeasurementUploader:
         self.token = os.getenv("DEVICE_TOKEN") or config.get("device_token")
         self.timeout = timeout
         self.on_uploaded = on_uploaded
-        self.uploaded_count = 0
         self._queue = queue.Queue()
         self._stopping = threading.Event()
         self._thread = None
@@ -109,9 +108,8 @@ class MeasurementUploader:
             )
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                    self.uploaded_count += len(batch["measurements"])
                     if self.on_uploaded:
-                        self.on_uploaded(self.uploaded_count)
+                        self.on_uploaded(len(batch["measurements"]))
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 ErrorLogger.log_error(f"API measurement upload failed: {exc}")
             finally:
