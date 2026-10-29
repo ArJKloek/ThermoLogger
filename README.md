@@ -111,7 +111,7 @@ python3 thermologger.py
 - **Button 1** (GPIO 16 / Pin 36): Start/Pause logging
 - **Button 2** (GPIO 13 / Pin 33): Reset display
 - **Button 3** (GPIO 15 / Pin 10): Check thermocouples (flashes unplugged channels)
-- **Button 4** (GPIO 31 / Pin 26): Cycle graph time range (1h → 2h → 15min → 30min)
+- **Button 4** (GPIO 06 / Pin 26): Cycle graph time range (1h → 2h → 15min → 30min)
 
 **Wiring**: Connect one side of each button to the GPIO pin, and the other side to any Ground (GND) pin. Buttons use active-LOW logic with internal pull-up resistors enabled.
 
