@@ -379,6 +379,7 @@ class EpaperPreviewWindow(QWidget):
 class MainWindow(QMainWindow):
     """Main application window for Atlas Logger."""
     button_pressed = pyqtSignal(int)  # Emitted for both GPIO and on-screen buttons
+    upload_count_changed = pyqtSignal(int)
     
     def __init__(self):
         super().__init__()
@@ -388,7 +389,8 @@ class MainWindow(QMainWindow):
         self.settings_manager = SettingsManager()
         self.epaper = EpaperDisplay(settings_manager=self.settings_manager)
         self.logger = ThermoLogger(settings_manager=self.settings_manager)
-        self.api_uploader = MeasurementUploader()
+        self.upload_count_changed.connect(self.update_upload_count)
+        self.api_uploader = MeasurementUploader(on_uploaded=self.upload_count_changed.emit)
         self.last_readings = []
         self.unplugged_channels = []  # 1-based channel numbers reported by worker
         # Store history with time-based cleanup (not just count-based)
@@ -443,6 +445,9 @@ class MainWindow(QMainWindow):
         # Load the UI file using uic
         try:
             uic.loadUi(str(ui_file), self)
+            upload_label = "Uploaded: 0 readings" if self.api_uploader.enabled else "API upload disabled"
+            self.upload_status_label = QLabel(upload_label)
+            self.statusbar.addPermanentWidget(self.upload_status_label)
             ErrorLogger.log_info("UI file loaded successfully")
         except Exception as e:
             error_msg = f"Error loading UI file: {e}"
@@ -664,6 +669,9 @@ class MainWindow(QMainWindow):
         print(f"Reader error: {message}")
         if hasattr(self, 'statusbar'):
             self.statusbar.showMessage(message, 5000)
+
+    def update_upload_count(self, count: int):
+        self.upload_status_label.setText(f"Uploaded: {count:,} readings")
 
     def update_epaper_display(self):
         """Update e-paper display with current readings."""

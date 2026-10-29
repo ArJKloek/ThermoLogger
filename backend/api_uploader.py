@@ -19,7 +19,7 @@ from backend.error_logger import ErrorLogger
 class MeasurementUploader:
     """Send logged temperature readings to the measurements API."""
 
-    def __init__(self, timeout: float = 5.0):
+    def __init__(self, timeout: float = 5.0, on_uploaded=None):
         config_path = Path(__file__).resolve().parent.parent / "api_config.json"
         config = {}
         try:
@@ -36,11 +36,14 @@ class MeasurementUploader:
         self.device_id = os.getenv("DEVICE_ID") or config.get("device_id")
         self.token = os.getenv("DEVICE_TOKEN") or config.get("device_token")
         self.timeout = timeout
+        self.on_uploaded = on_uploaded
+        self.uploaded_count = 0
         self._queue = queue.Queue()
         self._stopping = threading.Event()
         self._thread = None
+        self.enabled = bool(self.device_id and self.token)
 
-        if not self.device_id or not self.token:
+        if not self.enabled:
             if self.device_id or self.token:
                 ErrorLogger.log_warning("API upload disabled: DEVICE_ID and DEVICE_TOKEN are both required")
             return
@@ -106,7 +109,9 @@ class MeasurementUploader:
             )
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                    ErrorLogger.log_info(f"API measurement batch accepted: HTTP {response.status}")
+                    self.uploaded_count += len(batch["measurements"])
+                    if self.on_uploaded:
+                        self.on_uploaded(self.uploaded_count)
             except (urllib.error.URLError, TimeoutError, OSError) as exc:
                 ErrorLogger.log_error(f"API measurement upload failed: {exc}")
             finally:
