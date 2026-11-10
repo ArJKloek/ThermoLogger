@@ -534,7 +534,7 @@ class EpaperDisplay:
                 try:
                     temp_val = float(reading)
                     if not math.isnan(temp_val):
-                        value_text = f"{temp_val:.1f}"
+                        value_text = f"{temp_val:.2f}"
                         unit_text = "°C"
                     else:
                         value_text = "--"

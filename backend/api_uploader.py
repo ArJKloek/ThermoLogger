@@ -79,7 +79,7 @@ class MeasurementUploader:
             "measurement_id": str(uuid.uuid4()),
             "timestamp": iso_timestamp,
             "sensor": f"rtd{channel}",
-            "value": temperature,
+            "value": round(temperature, 2),
             "unit": "C",
             "quality": "good",
             "logging_on": logging_on,
