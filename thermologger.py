@@ -673,12 +673,14 @@ class MainWindow(QMainWindow):
         if not self.logger.is_logging:
             if channel_one > self.AUTO_LOG_START_TEMP_C and self.start_logging():
                 backfill_cutoff = datetime.now() - timedelta(minutes=self.AUTO_LOG_BACKFILL_MINUTES)
-                backfill = (
+                backfill = [
                     (timestamp, values)
                     for timestamp, values in self.history
                     if timestamp >= backfill_cutoff
-                )
+                ]
                 self.logger.log_readings(backfill)
+                # The newest entry is the current reading, which update_readings() uploads next.
+                self.api_uploader.submit_backfill(backfill[:-1], self.settings_manager)
                 if hasattr(self, 'statusbar'):
                     self.statusbar.showMessage("Automatic logging started; buffered readings saved", 5000)
             return
