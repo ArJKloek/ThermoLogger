@@ -400,6 +400,29 @@ class EpaperDisplay:
             logging.warning(f"Failed to load unplugged icon: {e}")
             print(f"[EPAPER] Warning: Failed to load unplugged icon: {e}")
 
+    @staticmethod
+    def _wifi_connected() -> bool:
+        """True if any wireless interface is up (Linux sysfs)."""
+        try:
+            for iface in Path("/sys/class/net").iterdir():
+                if (iface / "wireless").exists() and (iface / "operstate").read_text().strip() == "up":
+                    return True
+        except OSError:
+            pass
+        return False
+
+    @staticmethod
+    def _draw_wifi_icon(draw: ImageDraw.ImageDraw, x: int, y: int, size: int = 44) -> None:
+        """Draw the Wi-Fi symbol (geometry of ui/wifi-logo.svg) with its top-left at (x, y)."""
+        s = size / 366.0
+        cx, cy = x + size / 2, y + 287 * s
+        thickness = max(2, round(37 * s))
+        for outer_radius in (249, 180, 111):
+            r = outer_radius * s
+            draw.arc((cx - r, cy - r, cx + r, cy + r), 222, 318, fill=0, width=thickness)
+        dot = 41.5 * s
+        draw.ellipse((cx - dot, cy - dot, cx + dot, cy + dot), fill=0)
+
     def display_readings(self, readings: List[float]):
         """Update only temperature readings with partial refresh (fast update).
         Returns the PIL Image that was displayed."""
@@ -445,6 +468,9 @@ class EpaperDisplay:
             else:
                 range_text = f"Range: {int(self.time_range_hours * 60)}min"
             draw.text((self.width - 150, 65), range_text, font=self.font_small, fill=0)
+
+            if self._wifi_connected():
+                self._draw_wifi_icon(draw, self.width - 10 - 44, 10)
 
             # Determine enabled channels
             if self.settings_manager:
