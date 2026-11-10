@@ -534,7 +534,7 @@ class EpaperDisplay:
                 try:
                     temp_val = float(reading)
                     if not math.isnan(temp_val):
-                        value_text = f"{temp_val:.2f}"
+                        value_text = f"{temp_val:.1f}"
                         unit_text = "°C"
                     else:
                         value_text = "--"
@@ -601,4 +601,3 @@ class EpaperDisplay:
                 self.epd.sleep()
             except Exception as e:
                 logging.error(f"Error putting e-paper to sleep: {e}")
-

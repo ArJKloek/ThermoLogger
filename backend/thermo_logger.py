@@ -100,9 +100,9 @@ class ThermoLogger:
                 if self.settings_manager:
                     for i, temp in enumerate(readings):
                         if self.settings_manager.is_channel_enabled(i):
-                            row.append(f"{float(temp):.2f}")
+                            row.append(f"{float(temp):.1f}")
                 else:
-                    row += [f"{float(temp):.2f}" for temp in readings]
+                    row += [f"{float(temp):.1f}" for temp in readings]
                 rows.append(row)
 
             self.csv_writer.writerows(rows)

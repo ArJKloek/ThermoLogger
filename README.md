@@ -153,8 +153,8 @@ Temperature data is logged to `Data/temperatures_YYYY-MM-DD.csv`:
 
 ```csv
 Timestamp,CH1,CH2,CH3,CH4,CH5,CH6,CH7,CH8
-12-02-2026 10:15:30,22.50,23.10,21.80,22.90,23.40,22.60,23.00,22.70
-12-02-2026 10:15:35,22.60,23.20,21.90,23.00,23.50,22.70,23.10,22.80
+12-02-2026 10:15:30,22.5,23.1,21.8,22.9,23.4,22.6,23.0,22.7
+12-02-2026 10:15:35,22.6,23.2,21.9,23.0,23.5,22.7,23.1,22.8
 ```
 
 ### Log Location
@@ -175,7 +175,7 @@ ThermoLogger can also send real sensor readings to the measurements API used by 
 }
 ```
 
-Upload `api_config.json` alongside the application when deploying to the Raspberry Pi, or create/edit it directly in the project root on the Pi. The file is ignored by Git because it contains a secret. Environment variables `API_URL`, `DEVICE_ID`, and `DEVICE_TOKEN`, when set, override the matching file values. Each new sensor sample is sent to `/api/v1/measurements` (about once per second), whether or not CSV logging is active; only enabled channels with finite readings are uploaded. The `logging_on` field reflects the current CSV logging state. If either credential is blank, API upload is disabled and CSV logging continues normally. The device ID and token must also be configured on the API server. Uploaded temperature values are rounded to two decimal places.
+Upload `api_config.json` alongside the application when deploying to the Raspberry Pi, or create/edit it directly in the project root on the Pi. The file is ignored by Git because it contains a secret. Environment variables `API_URL`, `DEVICE_ID`, and `DEVICE_TOKEN`, when set, override the matching file values. Each new sensor sample is sent to `/api/v1/measurements` (about once per second), whether or not CSV logging is active; only enabled channels with finite readings are uploaded. The `logging_on` field reflects the current CSV logging state. If either credential is blank, API upload is disabled and CSV logging continues normally. The device ID and token must also be configured on the API server. Uploaded temperature values are rounded to one decimal place.
 
 ## Error Logging
 
