@@ -57,6 +57,7 @@ class MeasurementUploader:
             return False
 
         measurements = []
+        timestamp = datetime.now(timezone.utc).isoformat()
         for channel, value in enumerate(readings):
             if not settings_manager.is_channel_enabled(channel):
                 continue
@@ -69,7 +70,7 @@ class MeasurementUploader:
 
             measurements.append({
                 "measurement_id": str(uuid.uuid4()),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": timestamp,
                 "sensor": f"rtd{channel}",
                 "value": temperature,
                 "unit": "C",
